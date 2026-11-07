@@ -5,6 +5,39 @@ import type { ProviderCredential, ProviderCredentialStatus, QuotaProviderId } fr
 export type AppRoute = "day" | "trends" | "insights" | "limits" | "alerts" | "profile" | "settings" | "diagnostics";
 export type EngineStatus = "starting" | "ready" | "degraded" | "stopped";
 
+export interface ActivityWatchRange {
+  start: string;
+  end: string;
+}
+
+export type ActivityDevice = "computer" | "phone";
+
+export interface ActivityWatchRecord {
+  timestamp: string;
+  duration: number;
+  device: ActivityDevice;
+  bucketId: string;
+  app: string | null;
+  title: string | null;
+}
+
+export interface ActivityWatchBucket {
+  id: string;
+  type: string;
+  hostname: string;
+  lastUpdated: string | null;
+  device: ActivityDevice;
+  eventCount: number;
+  error: string | null;
+}
+
+export interface ActivityWatchSnapshot {
+  connected: true;
+  fetchedAt: string;
+  buckets: ActivityWatchBucket[];
+  events: ActivityWatchRecord[];
+}
+
 export interface DesktopUpdateState {
   status: "idle" | "checking" | "current" | "downloading" | "ready" | "available" | "error" | "unavailable";
   currentVersion: string;
