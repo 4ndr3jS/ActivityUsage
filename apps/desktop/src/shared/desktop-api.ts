@@ -154,6 +154,8 @@ export interface UsageAtlasDesktopAPI {
   chooseCustomBackground(): Promise<BackgroundImageSelection | null>;
   getSnapshot(): Promise<DashboardState>;
   refreshAll(): Promise<DashboardState>;
+  getActivityWatchData(range: ActivityWatchRange): Promise<ActivityWatchSnapshot>;
+  saveActivityWatchExport(json: string): Promise<boolean>;
   setProviderEnabled(providerID: string, enabled: boolean): Promise<DashboardState>;
   getPreferences(): Promise<DesktopPreferences>;
   updatePreferences(patch: Partial<DesktopPreferences>): Promise<DesktopPreferences>;
@@ -183,6 +185,8 @@ export const IPC = {
   chooseCustomBackground: 'background:choose-custom',
   snapshot: "dashboard:snapshot",
   refreshAll: "dashboard:refresh-all",
+  activityWatchData: "activitywatch:data",
+  saveActivityWatchExport: "activitywatch:export",
   setProviderEnabled: "dashboard:set-provider-enabled",
   getPreferences: "preferences:get",
   updatePreferences: "preferences:update",

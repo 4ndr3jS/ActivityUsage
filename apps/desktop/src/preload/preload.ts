@@ -4,6 +4,8 @@ import { IPC } from "../shared/desktop-api";
 
 const api: UsageAtlasDesktopAPI = {
   platform: process.platform,
+  getActivityWatchData: range => ipcRenderer.invoke(IPC.activityWatchData, range),
+  saveActivityWatchExport: json => ipcRenderer.invoke(IPC.saveActivityWatchExport, json),
   getProviderCredentials: () => ipcRenderer.invoke(IPC.getProviderCredentials),
   setProviderCredential: (provider, credential) => ipcRenderer.invoke(IPC.setProviderCredential, provider, credential),
   getUpdateState: () => ipcRenderer.invoke(IPC.getUpdateState),
