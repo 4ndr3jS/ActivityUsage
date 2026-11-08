@@ -97,6 +97,10 @@ export function PulseIcon(props: IconProps): React.JSX.Element {
   return <IconBase {...props}><path d="M3 12h4l2-6 4 12 2-6h6" /></IconBase>;
 }
 
+export function DeviceActivityIcon(props: IconProps): React.JSX.Element {
+  return <IconBase {...props}><rect height="17" rx="2.5" width="14" x="5" y="3.5" /><path d="M8 18.5h8M9 14l2-3 2 2 2-4" /><path d="M10 21h4" /></IconBase>;
+}
+
 export function RefreshIcon(props: IconProps): React.JSX.Element {
   return (
     <IconBase {...props}>
