@@ -4,6 +4,30 @@ import type { ActivityDevice, ActivityWatchRecord, ActivityWatchSnapshot } from 
 
 import { ChevronLeftIcon, ChevronRightIcon, RefreshIcon, ShareIcon } from "../icons";
 
+import { Area } from "./dither-kit/area";
+
+import { AreaChart } from "./dither-kit/area-chart";
+
+import { Bar } from "./dither-kit/bar";
+
+import { BarChart } from "./dither-kit/bar-chart";
+
+import { Grid } from "./dither-kit/grid";
+
+import { Pie } from "./dither-kit/pie";
+
+import { PieChart } from "./dither-kit/pie-chart";
+
+import { Sparkline } from "./dither-kit/sparkline";
+
+import { Tooltip } from "./dither-kit/tooltip";
+
+import { XAxis } from "./dither-kit/x-axis";
+
+import { YAxis } from "./dither-kit/y-axis";
+
+import type { DitherColor } from "./dither-kit/palette";
+
 import { createActivityPeriod } from "../activity-period";
 
 import "./activity-dashboard.css";
@@ -245,18 +269,79 @@ interface Summary {
 
 type ActivityRow = { key: string; label: string; seconds: number };
 
-function OverviewView(_props: {
+function dailyRows(days: DayActivity[], key: "computer" | "phone" | "combined"): ActivityRow[] {
+  return days.map(day => ({ key: day.key, label: day.label, seconds: day[key] }));
+}
+
+function OverviewView({ days, hours, apps, periodLabel, rangeDays, summary, previous, peakDay }: {
   days: DayActivity[]; hours: ActivityRow[]; apps: AppActivity[]; periodLabel: string;
   rangeDays: RangeDays; summary: Summary; previous: Summary | null; peakDay: DayActivity | null;
-}): React.JSX.Element { return <></>; }
+}): React.JSX.Element {
+  return <>
+    <div className="activity-hero-grid">
+      <section className="activity-glass-card activity-hero">
+        <p className="activity-eyebrow">{rangeDays === 1 && days[0] ? new Date(`${days[0].key}T12:00:00`).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" }) : periodLabel}</p>
+        <h1>Your device activity</h1>
+        <div className="activity-hero-metric"><span>Combined active time</span><strong>{formatDuration(summary.combined)}</strong></div>
+        <p className="activity-hero-context">{previous ? compareDelta(summary.combined, previous.combined) : "Overlapping device time counted once"}</p>
+        <div className="activity-hero-devices"><DeviceIcon /><span>Computer</span><DeviceIcon phone /><span>Phone</span></div>
+      </section>
+      <DeviceMix summary={summary} />
+    </div>
+    <div className="activity-metric-grid">
+      <MetricCard title="Computer activity" value={formatDuration(summary.computer)} note="Recorded foreground-app intervals" delta={previous ? compareDelta(summary.computer, previous.computer) : null} spark={days.map(day => day.computer)} tone="green" />
+      <MetricCard title="Phone activity" value={formatDuration(summary.phone)} note="Recorded Android app intervals" delta={previous ? compareDelta(summary.phone, previous.phone) : null} spark={days.map(day => day.phone)} tone="purple" />
+    </div>
+    <div className="activity-metric-grid activity-metric-grid--compact">
+      <MetricCard title="Daily average" value={formatDuration(days.length ? summary.combined / days.length : 0)} note="Across calendar days in range" />
+      <MetricCard title="Peak day" value={peakDay && peakDay.combined > 0 ? formatDuration(peakDay.combined) : "0m"} note={peakDay && peakDay.combined > 0 ? peakDay.label : "No recorded activity"} />
+      <MetricCard title="Recorded overlap" value={formatDuration(summary.overlap)} note="Time both devices were active" />
+    </div>
+    <SectionHeading eyebrow="Selected period" title={rangeDays === 1 ? "Usage through the day" : "Usage through the period"} detail={periodLabel} />
+    <ChartPanel title={rangeDays === 1 ? "Hourly activity" : "Combined activity"} subtitle="Combined active time, with overlap counted once" rows={rangeDays === 1 ? hours : dailyRows(days, "combined")} tone="blue" kind={rangeDays === 1 ? "bar" : "area"} />
+    <SectionHeading eyebrow="Applications" title="Where your time went" detail={periodLabel} />
+    <AppList apps={apps.slice(0, 8)} title="Most used apps" subtitle="Ranked by recorded foreground-app duration" />
+  </>;
+}
 
 function HistoryView(_props: { days: DayActivity[]; periodLabel: string; summary: Summary; previous: Summary | null }): React.JSX.Element { return <></>; }
+
+function DeviceIcon({ phone = false }: { phone?: boolean }): React.JSX.Element {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">{phone ? <><rect x="6" y="2" width="12" height="20" rx="3" /><path d="M10 18h4M10 5h4" /></> : <><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></>}</svg>;
+}
+
+function DeviceMix({ summary }: { summary: Summary }): React.JSX.Element {
+  const total = summary.computer + summary.phone;
+  const data = [{ name: "Computer", value: summary.computer }, { name: "Phone", value: summary.phone }];
+  const config = { Computer: { color: "green" as const, label: "Computer" }, Phone: { color: "purple" as const, label: "Phone" } };
+  return <section className="activity-glass-card activity-device-breakdown">
+    <div className="activity-chart-panel__header"><div><h3>Device mix</h3><p>Share of tracked time across your devices</p></div></div>
+    <div className="activity-device-mix">
+      <div className={`activity-donut${total ? "" : " is-empty"}`} role="img" aria-label={total ? `Tracked time ${formatDuration(total)}. Computer ${Math.round(summary.computer / total * 100)}%, phone ${Math.round(summary.phone / total * 100)}%.` : "No device activity recorded"}>
+        {total > 0 && <PieChart config={config} data={data.filter(row => row.value > 0)} dataKey="value" nameKey="name" innerRadius={0.68} margins={{ top: 8, right: 8, bottom: 8, left: 8 }} bloom="low" animate={false}>
+          <Pie variant="gradient" /><Tooltip valueFormatter={formatDuration} variant="frosted-glass" />
+        </PieChart>}
+        <div className="activity-donut-center"><strong>{formatDuration(total)}</strong><span>tracked time</span></div>
+      </div>
+      <div className="activity-device-legend">{data.map(row => <div className="activity-device-row" key={row.name}>
+        <span className={`activity-device-icon ${row.name === "Phone" ? "is-phone" : ""}`}><DeviceIcon phone={row.name === "Phone"} /></span>
+        <div><strong>{row.name}</strong><small>{total ? `${Math.round(row.value / total * 100)}% of tracked time` : "No records in this range"}</small></div>
+        <b>{formatDuration(row.value)}</b>
+      </div>)}</div>
+    </div>
+    <div className="activity-mix-context"><span>Combined, overlap removed <b>{formatDuration(summary.combined)}</b></span><span>Recorded overlap <b>{formatDuration(summary.overlap)}</b></span></div>
+  </section>;
+}
 
 function BreakdownView(_props: { apps: AppActivity[]; summary: Summary }): React.JSX.Element { return <></>; }
 
 function InsightsView(_props: { days: DayActivity[]; hours: Array<{ label: string; seconds: number }>; apps: AppActivity[]; summary: Summary }): React.JSX.Element { return <></>; }
 
 function SourcesView(_props: { snapshot: ActivityWatchSnapshot | null; device: DeviceFilter }): React.JSX.Element { return <></>; }
+
+function SectionHeading({ eyebrow, title, detail }: { eyebrow: string; title: string; detail?: string }): React.JSX.Element {
+  return <div className="activity-section-heading"><div><p className="activity-eyebrow">{eyebrow}</p><h2>{title}</h2></div>{detail && <span>{detail}</span>}</div>;
+}
 
 function ActivitySettingsView(_props: {
   showTitles: boolean;
@@ -266,6 +351,38 @@ function ActivitySettingsView(_props: {
   onIncludeLabels(value: boolean): void;
   onAutoRefresh(value: boolean): void;
 }): React.JSX.Element { return <></>; }
+
+function MetricCard({ title, value, note, delta, spark, tone = "green" }: { title: string; value: string; note: string; delta?: string | null; spark?: number[]; tone?: DitherColor }): React.JSX.Element {
+  return <article className="activity-glass-card activity-metric-card"><div className="activity-metric-copy"><span>{title}</span><strong title={value}>{value}</strong><small>{delta && <em>{delta}</em>}{note}</small></div>
+    {spark && spark.length > 1 && spark.some(value => value > 0) && <div className="activity-spark" aria-hidden="true"><Sparkline data={spark} color={tone} bloom="low" /></div>}
+  </article>;
+}
+
+function ChartPanel({ title, subtitle, rows, tone, kind = "area" }: {
+  title: string; subtitle: string; rows: ActivityRow[]; tone: DitherColor; kind?: "area" | "bar";
+}): React.JSX.Element {
+  const total = rows.reduce((sum, row) => sum + row.seconds, 0);
+  const Chart = kind === "bar" || rows.length === 1 ? BarChart : AreaChart;
+  const Series = kind === "bar" || rows.length === 1 ? Bar : Area;
+  const config = { seconds: { color: tone, label: title } };
+  return <section className="activity-glass-card activity-chart-panel">
+    <div className="activity-chart-panel__header"><div><h3>{title}</h3><p>{subtitle}</p></div><strong>{formatDuration(total)}</strong></div>
+    <div className="activity-chart-plot" role="group" aria-label={`${title}, ${formatDuration(total)} total`}>
+      {total > 0 ? <Chart data={rows} config={config} bloom="low" animate={false} margins={{ top: 16, right: 24, bottom: 30, left: 44 }}>
+        <Grid /><XAxis dataKey="label" maxTicks={8} minTickSpacing={70} /><YAxis tickFormatter={formatDuration} />
+        <Series dataKey="seconds" variant="gradient" /><Tooltip labelKey="label" valueFormatter={formatDuration} variant="frosted-glass" />
+      </Chart> : <div className="activity-chart-empty"><span>No recorded activity</span><small>No intervals for this device in the selected period.</small></div>}
+    </div>
+    {total > 0 && <details className="activity-chart-values"><summary>View chart values</summary><div><table><thead><tr><th>Period</th><th>Active time</th></tr></thead><tbody>{rows.map(row => <tr key={row.key}><td>{row.label}</td><td>{formatDuration(row.seconds)}</td></tr>)}</tbody></table></div></details>}
+  </section>;
+}
+
+function AppList({ apps, title, subtitle }: { apps: AppActivity[]; title: string; subtitle: string }): React.JSX.Element {
+  const maximum = Math.max(1, ...apps.map(app => app.seconds));
+  return <section className="activity-glass-card activity-app-list"><div className="activity-chart-panel__header"><div><h3>{title}</h3><p>{subtitle}</p></div></div>
+    {apps.length ? <ol>{apps.map((app, index) => <li key={app.label}><span className="activity-app-rank">{String(index + 1).padStart(2, "0")}</span><div className="activity-app-detail"><div className="activity-app-row"><span title={app.label}>{app.label}</span><b>{formatDuration(app.seconds)}</b></div><div className="activity-app-track"><i style={{ width: `${app.seconds / maximum * 100}%` }} /></div><small>{app.events.toLocaleString()} recorded events</small></div></li>)}</ol> : <p className="activity-empty">No app-level events in this range.</p>}
+  </section>;
+}
 
 function labelPeriod(period: Period, days: RangeDays): string {
   if (days === 1 && period.end.getTime() > Date.now()) return "Today";
@@ -413,6 +530,19 @@ function buildApps(events: ActivityWatchRecord[], showTitles: boolean): AppActiv
     groups.set(label, existing);
   }
   return [...groups.values()].sort((left, right) => right.seconds - left.seconds);
+}
+
+function compareDelta(current: number, previous: number): string {
+  if (previous <= 0) return current > 0 ? "New activity" : "No prior activity";
+  const percent = Math.round((current - previous) / previous * 100);
+  return `${percent > 0 ? "+" : ""}${percent}% vs prior`;
+}
+
+function formatDuration(seconds: number): string {
+  const minutes = Math.max(0, Math.round(seconds / 60));
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return hours ? `${hours}h ${remainder}m` : `${remainder}m`;
 }
 
 function readPreference(key: string): boolean {
