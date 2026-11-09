@@ -352,7 +352,9 @@ function DeviceMix({ summary }: { summary: Summary }): React.JSX.Element {
   </section>;
 }
 
-function BreakdownView(_props: { apps: AppActivity[]; summary: Summary }): React.JSX.Element { return <></>; }
+function BreakdownView({ apps, summary }: { apps: AppActivity[]; summary: Summary }): React.JSX.Element {
+  return <div className="activity-breakdown-grid"><DeviceMix summary={summary} /><AppList apps={apps} title="Applications" subtitle="Recorded foreground-app durations" /></div>;
+}
 
 function InsightsView(_props: { days: DayActivity[]; hours: Array<{ label: string; seconds: number }>; apps: AppActivity[]; summary: Summary }): React.JSX.Element { return <></>; }
 
