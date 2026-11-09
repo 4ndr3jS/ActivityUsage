@@ -373,7 +373,19 @@ function InsightsView({ days, hours, apps, summary }: { days: DayActivity[]; hou
   </>;
 }
 
-function SourcesView(_props: { snapshot: ActivityWatchSnapshot | null; device: DeviceFilter }): React.JSX.Element { return <></>; }
+function SourcesView({ snapshot, device }: { snapshot: ActivityWatchSnapshot | null; device: DeviceFilter }): React.JSX.Element {
+  const buckets = snapshot?.buckets.filter(bucket => device === "all" || bucket.device === device) ?? [];
+  return <>
+    <SectionHeading eyebrow="Local connections" title="Connected watchers" detail={`${buckets.length} sources in this view`} />
+    <div className="activity-source-grid">{buckets.map(bucket => <article className="activity-glass-card activity-source-card" key={bucket.id}>
+      <div className="activity-source-card__top"><span className={`activity-source-tag activity-source-tag--${bucket.device}`}><DeviceIcon phone={bucket.device === "phone"} />{bucket.device === "phone" ? "Phone watcher" : "Computer watcher"}</span><span className={`activity-source-state${bucket.error ? " is-warning" : bucket.eventCount ? "" : " is-idle"}`}><i />{bucket.error ? "Unavailable" : bucket.eventCount ? "Records available" : "No records in range"}</span></div>
+      <h3>{bucket.hostname}</h3><dl><div><dt>Bucket</dt><dd title={bucket.id}>{bucket.id}</dd></div><div><dt>Watcher type</dt><dd>{bucket.type}</dd></div><div><dt>Events in selected range</dt><dd>{bucket.eventCount.toLocaleString()}</dd></div><div><dt>Last updated</dt><dd>{bucket.lastUpdated ? new Date(bucket.lastUpdated).toLocaleString() : "Not provided by ActivityWatch"}</dd></div></dl>
+      {bucket.error && <p className="activity-source-error">{bucket.error}</p>}
+    </article>)}</div>
+    {snapshot && !buckets.length && <p className="activity-empty">No activity sources match the selected device.</p>}
+    {!snapshot && <p className="activity-empty">Start ActivityWatch on this computer, then refresh to read its sources.</p>}
+  </>;
+}
 
 function SectionHeading({ eyebrow, title, detail }: { eyebrow: string; title: string; detail?: string }): React.JSX.Element {
   return <div className="activity-section-heading"><div><p className="activity-eyebrow">{eyebrow}</p><h2>{title}</h2></div>{detail && <span>{detail}</span>}</div>;
