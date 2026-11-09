@@ -356,7 +356,22 @@ function BreakdownView({ apps, summary }: { apps: AppActivity[]; summary: Summar
   return <div className="activity-breakdown-grid"><DeviceMix summary={summary} /><AppList apps={apps} title="Applications" subtitle="Recorded foreground-app durations" /></div>;
 }
 
-function InsightsView(_props: { days: DayActivity[]; hours: Array<{ label: string; seconds: number }>; apps: AppActivity[]; summary: Summary }): React.JSX.Element { return <></>; }
+function InsightsView({ days, hours, apps, summary }: { days: DayActivity[]; hours: Array<{ label: string; seconds: number }>; apps: AppActivity[]; summary: Summary }): React.JSX.Element {
+  const peakDay = days.reduce<DayActivity | null>((peak, day) => day.combined > (peak?.combined ?? 0) ? day : peak, null);
+  const peakHour = hours.reduce<{ label: string; seconds: number } | null>((peak, hour) => hour.seconds > (peak?.seconds ?? 0) ? hour : peak, null);
+  const phoneShare = summary.computer + summary.phone ? Math.round(summary.phone / (summary.computer + summary.phone) * 100) : 0;
+  return <>
+    <div className="activity-insight-grid">
+      <MetricCard title="Busiest day" value={peakDay ? formatDuration(peakDay.combined) : "No data"} note={peakDay?.label ?? "No recorded activity in this period"} spark={days.map(day => day.combined)} tone="green" />
+      <MetricCard title="Busiest hour" value={peakHour?.label ?? "No data"} note={peakHour ? `${formatDuration(peakHour.seconds)} accumulated across this period` : "No recorded hourly activity"} />
+      <MetricCard title="Phone share" value={`${phoneShare}%`} note="Share of summed device intervals" />
+      <MetricCard title="Top app" value={apps[0]?.label ?? "No app records"} note={apps[0] ? `${formatDuration(apps[0].seconds)} of recorded event time` : "No recorded app names"} />
+    </div>
+    <SectionHeading eyebrow="Observed patterns" title="Your daily rhythm" detail="Local time" />
+    <ChartPanel title="Activity by hour of day" subtitle="Combined time accumulated in each hour across the selected period" rows={hours.map((hour, index) => ({ ...hour, key: String(index) }))} tone="blue" kind="bar" />
+    <p className="activity-explainer">These are summaries of ActivityWatch records. They do not indicate focus, attention, or productivity.</p>
+  </>;
+}
 
 function SourcesView(_props: { snapshot: ActivityWatchSnapshot | null; device: DeviceFilter }): React.JSX.Element { return <></>; }
 
