@@ -304,7 +304,26 @@ function OverviewView({ days, hours, apps, periodLabel, rangeDays, summary, prev
   </>;
 }
 
-function HistoryView(_props: { days: DayActivity[]; periodLabel: string; summary: Summary; previous: Summary | null }): React.JSX.Element { return <></>; }
+function HistoryView({ days, periodLabel, summary, previous }: { days: DayActivity[]; periodLabel: string; summary: Summary; previous: Summary | null }): React.JSX.Element {
+  const peak = days.reduce((value, day) => Math.max(value, day.combined), 0);
+  return <>
+    <div className="activity-metric-grid">
+      <MetricCard title="Combined active time" value={formatDuration(summary.combined)} note="Overlap counted once" delta={previous ? compareDelta(summary.combined, previous.combined) : null} spark={days.map(day => day.combined)} tone="green" />
+      <MetricCard title="Tracked device time" value={formatDuration(summary.computer + summary.phone)} note="Sum of computer and phone intervals" spark={days.map(day => day.computer + day.phone)} tone="blue" />
+    </div>
+    <div className="activity-metric-grid activity-metric-grid--compact">
+      <MetricCard title="Daily average" value={formatDuration(summary.combined / Math.max(1, days.length))} note={`Across ${days.length} calendar days`} />
+      <MetricCard title="Peak day" value={formatDuration(peak)} note={peak > 0 ? days.find(day => day.combined === peak)?.label ?? "" : "No recorded activity"} />
+      <MetricCard title="Recorded overlap" value={formatDuration(summary.overlap)} note="Simultaneous computer and phone use" />
+    </div>
+    <SectionHeading eyebrow="Over time" title="Device activity" detail={periodLabel} />
+    <div className="activity-chart-grid">
+      <ChartPanel title="Computer activity" subtitle={periodLabel} rows={dailyRows(days, "computer")} tone="green" />
+      <ChartPanel title="Phone activity" subtitle={periodLabel} rows={dailyRows(days, "phone")} tone="purple" />
+    </div>
+    <ChartPanel title="Combined active time" subtitle="Overlapping computer and phone use counts once" rows={dailyRows(days, "combined")} tone="blue" />
+  </>;
+}
 
 function DeviceIcon({ phone = false }: { phone?: boolean }): React.JSX.Element {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">{phone ? <><rect x="6" y="2" width="12" height="20" rx="3" /><path d="M10 18h4M10 5h4" /></> : <><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></>}</svg>;
