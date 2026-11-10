@@ -1,18 +1,17 @@
 import type { AppRoute, EngineStatus } from "../../shared/desktop-api";
 import { useLayoutEffect, useRef } from "react";
-import { BellIcon, DayIcon, InsightsIcon, ProfileIcon, PulseIcon, SettingsIcon, TrendsIcon } from "../icons";
+import { DayIcon, DeviceActivityIcon, InsightsIcon, PulseIcon, SettingsIcon, TrendsIcon } from "../icons";
 
 interface AppShellProps {
   route: AppRoute;
-  engineStatus: EngineStatus;
-  /** Open health notices — the rail dot is the only place they interrupt anything. */
-  noticeCount: number;
   onNavigate(route: AppRoute): void;
-  /** A quiet dot on Profile until the page has been opened once. */
-  profileBadge?: boolean;
-  activityControl?: React.ReactNode;
   updateControl?: React.ReactNode;
   children: React.ReactNode;
+  /** Kept optional for callers compiled from older local builds. */
+  engineStatus?: EngineStatus;
+  noticeCount?: number;
+  profileBadge?: boolean;
+  activityControl?: React.ReactNode;
 }
 
 const primaryNavigation: Array<{
@@ -22,23 +21,25 @@ const primaryNavigation: Array<{
 }> = [
   { route: "day", label: "Today", icon: DayIcon },
   { route: "trends", label: "History", icon: TrendsIcon },
+  { route: "activity", label: "Breakdown", icon: DeviceActivityIcon },
   { route: "insights", label: "Insights", icon: InsightsIcon },
-  { route: "alerts", label: "Usage alerts", icon: BellIcon },
-  { route: "profile", label: "Public profile", icon: ProfileIcon }
+  { route: "sources", label: "Sources", icon: PulseIcon }
 ];
 
 const routeTitles: Record<AppRoute, string> = {
   day: "Today",
   trends: "History",
+  activity: "Breakdown",
   insights: "Insights",
-  limits: "Limits",
-  alerts: "Usage alerts",
-  profile: "Public profile",
-  diagnostics: "Diagnostics",
-  settings: "Settings"
+  sources: "Sources",
+  limits: "Device limits",
+  alerts: "Activity alerts",
+  profile: "Device profile",
+  settings: "Settings",
+  diagnostics: "Activity sources"
 };
 
-export function AppShell({ route, engineStatus, noticeCount, onNavigate, profileBadge = false, activityControl, updateControl, children }: AppShellProps): React.JSX.Element {
+export function AppShell({ route, onNavigate, updateControl, children }: AppShellProps): React.JSX.Element {
   const workspaceRef = useRef<HTMLElement>(null);
 
   useLayoutEffect(() => {
@@ -53,46 +54,22 @@ export function AppShell({ route, engineStatus, noticeCount, onNavigate, profile
     <div className="atlas-app-shell">
       <header aria-label="UsageAtlas" className="atlas-app-shell__titlebar drag-region">
         <div className="atlas-app-shell__brand">
-          <span aria-hidden="true" className="atlas-app-shell__brand-mark">
-            <img alt="" src="./usageatlas.png" />
-          </span>
+          <span aria-hidden="true" className="atlas-app-shell__brand-mark"><img alt="" src="./usageatlas.png" /></span>
           <span className="atlas-app-shell__brand-name">UsageAtlas</span>
           {updateControl}
           <span aria-hidden="true" className="atlas-app-shell__brand-divider" />
           <span className="atlas-app-shell__route-name">{routeTitles[route]}</span>
-          {activityControl}
         </div>
       </header>
 
       <aside aria-label="Primary navigation" className="atlas-app-shell__rail no-drag">
-        <nav aria-label="Main navigation" className="atlas-app-shell__navigation">
-          {primaryNavigation.map((item) => (
-            <RailButton
-              icon={item.icon}
-              badge={item.route === "profile" && profileBadge}
-              isCurrent={route === item.route}
-              key={item.route}
-              label={item.label}
-              onPress={() => onNavigate(item.route)}
-            />
+        <nav aria-label="Device activity pages" className="atlas-app-shell__navigation">
+          {primaryNavigation.map(item => (
+            <RailButton key={item.route} icon={item.icon} isCurrent={route === item.route} label={item.label} onPress={() => onNavigate(item.route)} />
           ))}
         </nav>
-
-        <nav aria-label="App controls" className="atlas-app-shell__navigation atlas-app-shell__navigation--footer">
-          <RailButton
-            icon={PulseIcon}
-            isCurrent={route === "diagnostics"}
-            label="Diagnostics"
-            noticeCount={noticeCount}
-            onPress={() => onNavigate("diagnostics")}
-            status={engineStatus}
-          />
-          <RailButton
-            icon={SettingsIcon}
-            isCurrent={route === "settings"}
-            label="Settings"
-            onPress={() => onNavigate("settings")}
-          />
+        <nav aria-label="App settings" className="atlas-app-shell__navigation atlas-app-shell__navigation--footer">
+          <RailButton icon={SettingsIcon} isCurrent={route === "settings"} label="Settings" onPress={() => onNavigate("settings")} />
         </nav>
       </aside>
 
@@ -108,61 +85,20 @@ function handleWorkspaceScroll(event: React.UIEvent<HTMLElement>): void {
 }
 
 function RailButton({
-  badge = false,
   icon: Icon,
   isCurrent,
   label,
-  noticeCount = 0,
-  onPress,
-  status
+  onPress
 }: {
-  badge?: boolean;
   icon: (props: React.SVGProps<SVGSVGElement>) => React.JSX.Element;
   isCurrent: boolean;
   label: string;
-  noticeCount?: number;
   onPress(): void;
-  status?: EngineStatus;
 }): React.JSX.Element {
-  const description = status ? `${label}: ${engineLabel(status)}${noticeLabel(noticeCount)}` : badge ? `${label} · New` : label;
   return (
-    <button
-      aria-current={isCurrent ? "page" : undefined}
-      aria-label={description}
-      className="atlas-app-shell__rail-button"
-      onClick={onPress}
-      title={description}
-      type="button"
-    >
-      <span className="atlas-app-shell__rail-icon">
-        <Icon aria-hidden="true" />
-        {status ? <StatusDot hasNotices={noticeCount > 0} status={status} /> : null}
-        {badge ? <span aria-hidden="true" className="atlas-app-shell__status-dot" data-badge="true" /> : null}
-      </span>
-      <span className="sr-only">{description}</span>
+    <button aria-current={isCurrent ? "page" : undefined} aria-label={label} className="atlas-app-shell__rail-button" onClick={onPress} title={label} type="button">
+      <span className="atlas-app-shell__rail-icon"><Icon aria-hidden="true" /></span>
+      <span className="sr-only">{label}</span>
     </button>
   );
-}
-
-function StatusDot({ hasNotices, status }: { hasNotices: boolean; status: EngineStatus }): React.JSX.Element {
-  return (
-    <span
-      aria-hidden="true"
-      className="atlas-app-shell__status-dot"
-      data-notices={hasNotices ? "true" : undefined}
-      data-status={status}
-    />
-  );
-}
-
-function noticeLabel(count: number): string {
-  if (count === 0) return "";
-  return ` · ${count} ${count === 1 ? "notice" : "notices"}`;
-}
-
-function engineLabel(status: EngineStatus): string {
-  if (status === "ready") return "Ready";
-  if (status === "starting") return "Starting";
-  if (status === "degraded") return "Needs attention";
-  return "Stopped";
 }

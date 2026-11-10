@@ -1,147 +1,83 @@
-import { CloudAccount, type KnownProfileStatus } from "./cloud-account";
-import { ProviderCredentialStore, configureProviderCredentials } from "./provider-credentials";
-import { isQuotaProvider, validateProviderCredential } from "../shared/quota-providers";
-import type { DashboardSnapshot } from "@usageatlas/contracts";
-import { existsSync, mkdtempSync, statSync, writeFileSync } from "node:fs";
 import {
   app,
   BrowserWindow,
-  clipboard,
   dialog,
   ipcMain,
-  Menu,
   nativeImage,
   nativeTheme,
   net,
-  Notification,
   protocol,
   screen,
   session,
   shell,
-  Tray,
-  type IpcMainInvokeEvent,
-  type MenuItemConstructorOptions
+  type IpcMainInvokeEvent
 } from "electron";
 import squirrelStartup from "electron-squirrel-startup";
+import { writeFileSync } from "node:fs";
 import path from "node:path";
-import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
-import { isLimitKey } from "../shared/capacity-model";
-import { providerHasUsage } from "../shared/cached-snapshot";
-import { DashboardSession } from "./dashboard-session";
-import type { AppRoute, DesktopPreferences } from "../shared/desktop-api";
-import { IPC, isBackgroundImagePreference } from "../shared/desktop-api";
-import { isUsageAlertPreferences } from "../shared/usage-alerts";
-import { isGrowthEvent } from "../shared/growth-events";
-import { EngineManager } from "./engine-manager";
-import { PreferenceStore } from "./preferences";
-import { PublicLeaderboard } from "./public-leaderboard";
-import { DesktopTelemetry } from "./telemetry";
-import { trayLimitLabels } from "./tray-limits";
+import { readActivityWatchData } from "./activitywatch";
 import { configureAutoUpdates, type DesktopUpdater } from "./updates";
 import { DOWNLOAD_PAGE_URL } from "./update-feed";
-import {
-  createUsageAlertNotification,
-  UsageAlertDeliveryLog,
-  UsageAlertEvaluator,
-  type TriggeredUsageAlert
-} from "./usage-alerts";
-import { UtilityEngineTransport } from "./utility-engine-transport";
-import { WINDOW_ASPECT_RATIO, windowSizeForWorkArea } from "./window-sizing";
+import { windowSizeForWorkArea } from "./window-sizing";
+import type { AppRoute } from "../shared/desktop-api";
+import { IPC } from "../shared/desktop-api";
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 protocol.registerSchemesAsPrivileged([
-  {
-    scheme: "app",
-    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true }
-  }
+  { scheme: "app", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }
 ]);
+
 app.enableSandbox();
 app.setName("UsageAtlas");
-if (process.env.USAGEATLAS_SMOKE_TEST === "1") {
-  const directory = mkdtempSync(path.join(tmpdir(), "usageatlas-smoke-"));
-  app.setPath("userData", directory);
-  writeFileSync(path.join(directory, "desktop-preferences.json"), JSON.stringify({
-    launchAtLogin: false,
-    anonymousAnalytics: false,
-    providerEnabled: { codex: false, claude: false, cursor: false, opencode: false, antigravity: false, pi: false, muse: false,
-      warp: false, kimi: false, kilo: false, copilot: false, factory: false, amp: false, qoder: false }
-  }));
-}
 if (process.platform === "win32") {
-  app.setAppUserModelId(app.isPackaged
-    ? "com.squirrel.UsageAtlas.UsageAtlas"
-    : "com.usageatlas.desktop.dev");
+  app.setAppUserModelId(app.isPackaged ? "com.squirrel.UsageAtlas.UsageAtlas" : "com.usageatlas.desktop.dev");
 }
 
 let mainWindow: BrowserWindow | null = null;
-let tray: Tray | null = null;
-let lastTraySnapshot: DashboardSnapshot | null = null;
-let usageCheckTimer: NodeJS.Timeout | null = null;
-let profileStatusReported = false;
-let usageScanReported = false;
-let isQuitting = false;
+let updater: DesktopUpdater;
 let installPendingUpdate: (() => void) | null = null;
-let engine: EngineManager;
-let cloudAccount: CloudAccount;
-const leaderboard = new PublicLeaderboard();
-let providerCredentials: ProviderCredentialStore;
-let preferences: PreferenceStore;
-let telemetry: DesktopTelemetry;
-let dashboard: DashboardSession;
-let updates: DesktopUpdater;
 
-const activeUsageNotifications = new Set<Notification>();
-let usageAlertEvaluator = new UsageAlertEvaluator();
-const usageAlertDeliveryLog = new UsageAlertDeliveryLog();
-/** Includes the X and Bluesky composers for sharing a recap. */
-const allowedExternalHosts = new Set(["usageatlas.com", "github.com", "x.com", "bsky.app"]);
-const MAX_SHARE_IMAGE_LENGTH = 16 * 1024 * 1024;
-const PNG_DATA_URL = "data:image/png;base64,";
-const MAX_BACKGROUND_FILE_SIZE = 25 * 1024 * 1024;
-const runtimeIconDirectory = app.isPackaged
-  ? path.join(process.resourcesPath, "icons")
-  : path.join(app.getAppPath(), "resources", "icons");
-
+const allowedExternalHosts = new Set(["usageatlas.com", "github.com"]);
 const windowChrome = {
   light: { backgroundColor: "#f5f5f7", symbolColor: "#1d1d1f" },
   dark: { backgroundColor: "#1c1c1e", symbolColor: "#f5f5f7" }
 } as const;
+
 function runtimeIconPath(filename: "usageatlas.ico" | "usageatlas.png"): string {
-  return path.join(runtimeIconDirectory, filename);
+  const directory = app.isPackaged ? path.join(process.resourcesPath, "icons") : path.join(app.getAppPath(), "resources", "icons");
+  return path.join(directory, filename);
 }
 
-function customBackgroundPath(): string {
-  return path.join(app.getPath("userData"), "custom-background.jpg");
-}
-
-function customBackgroundUrl(): string | null {
-  const imagePath = customBackgroundPath();
-  if (!existsSync(imagePath)) return null;
-  const image = nativeImage.createFromPath(imagePath);
-  return image.isEmpty() ? null : `app://usageatlas/custom-background?v=${statSync(imagePath).mtimeMs}`;
-}
-
-function loadRuntimeLogo(): Electron.NativeImage {
+function runtimeLogo(): Electron.NativeImage {
   const image = nativeImage.createFromPath(runtimeIconPath("usageatlas.png"));
-  if (image.isEmpty()) throw new Error("UsageAtlas application icon could not be loaded");
+  if (image.isEmpty()) throw new Error("UsageAtlas application icon could not be loaded.");
   return image;
 }
 
-function loadWindowsIcon(): Electron.NativeImage {
-  const image = nativeImage.createFromPath(runtimeIconPath("usageatlas.ico"));
-  if (image.isEmpty()) throw new Error("UsageAtlas Windows icon could not be loaded");
-  return image;
+function trustedRendererUrl(value: string): boolean {
+  try {
+    const candidate = new URL(value);
+    if (MAIN_WINDOW_VITE_DEV_SERVER_URL) return candidate.origin === new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL).origin;
+    return candidate.protocol === "app:" && candidate.hostname === "usageatlas";
+  } catch {
+    return false;
+  }
 }
 
-function systemWindowChrome(): (typeof windowChrome)[keyof typeof windowChrome] {
-  return nativeTheme.shouldUseDarkColors ? windowChrome.dark : windowChrome.light;
+function allowedExternalUrl(value: string): boolean {
+  try {
+    const candidate = new URL(value);
+    return candidate.protocol === "https:" && allowedExternalHosts.has(candidate.hostname);
+  } catch {
+    return false;
+  }
 }
 
 function createWindow(route: AppRoute = "day"): BrowserWindow {
-  const chrome = systemWindowChrome();
+  const chrome = nativeTheme.shouldUseDarkColors ? windowChrome.dark : windowChrome.light;
   const { workArea } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
   const { width, height, minWidth, minHeight } = windowSizeForWorkArea(workArea);
   const window = new BrowserWindow({
@@ -154,14 +90,11 @@ function createWindow(route: AppRoute = "day"): BrowserWindow {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: chrome.backgroundColor,
-    icon: process.platform === "win32" ? loadWindowsIcon() : loadRuntimeLogo(),
+    icon: process.platform === "win32" ? nativeImage.createFromPath(runtimeIconPath("usageatlas.ico")) : runtimeLogo(),
     roundedCorners: true,
     ...(process.platform === "darwin"
       ? { titleBarStyle: "hiddenInset" as const }
-      : {
-          titleBarStyle: "hidden" as const,
-          titleBarOverlay: { color: chrome.backgroundColor, symbolColor: chrome.symbolColor, height: 40 }
-        }),
+      : { titleBarStyle: "hidden" as const, titleBarOverlay: { color: chrome.backgroundColor, symbolColor: chrome.symbolColor, height: 40 } }),
     title: "UsageAtlas",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -171,39 +104,25 @@ function createWindow(route: AppRoute = "day"): BrowserWindow {
       webSecurity: true
     }
   });
-  window.setAspectRatio(WINDOW_ASPECT_RATIO);
 
+  window.setAspectRatio(16 / 9);
   window.webContents.setWindowOpenHandler(({ url }) => {
-    if (isAllowedExternal(url)) void shell.openExternal(url);
+    if (allowedExternalUrl(url)) void shell.openExternal(url);
     return { action: "deny" };
   });
   window.webContents.on("will-navigate", (event, url) => {
-    if (!isTrustedRendererURL(url)) event.preventDefault();
+    if (!trustedRendererUrl(url)) event.preventDefault();
   });
-  window.once("ready-to-show", () => {
-    window.show();
-  });
-  window.on("close", (event) => {
-    if (!isQuitting && preferences.get().minimizeToTray) {
-      event.preventDefault();
-      window.hide();
-    }
-  });
-  window.on("closed", () => {
-    if (mainWindow === window) mainWindow = null;
-  });
+  window.once("ready-to-show", () => window.show());
+  window.once("closed", () => { if (mainWindow === window) mainWindow = null; });
 
-  const syncWindowChrome = (): void => {
-    const next = systemWindowChrome();
+  const syncChrome = (): void => {
+    const next = nativeTheme.shouldUseDarkColors ? windowChrome.dark : windowChrome.light;
     window.setBackgroundColor(next.backgroundColor);
-    if (process.platform !== "darwin") {
-      window.setTitleBarOverlay({ color: next.backgroundColor, symbolColor: next.symbolColor, height: 40 });
-    }
+    if (process.platform !== "darwin") window.setTitleBarOverlay({ color: next.backgroundColor, symbolColor: next.symbolColor, height: 40 });
   };
-  nativeTheme.on("updated", syncWindowChrome);
-  window.once("closed", () => {
-    nativeTheme.off("updated", syncWindowChrome);
-  });
+  nativeTheme.on("updated", syncChrome);
+  window.once("closed", () => nativeTheme.off("updated", syncChrome));
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     const url = new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
@@ -215,555 +134,87 @@ function createWindow(route: AppRoute = "day"): BrowserWindow {
   return window;
 }
 
-function showWindow(route: AppRoute = "day"): void {
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    mainWindow = createWindow(route);
-    // A new window waits half an hour between focus checks, so it starts from a fresh profile.
-    void cloudAccount.refreshProfile();
-  } else {
-    mainWindow.show();
-    mainWindow.focus();
-    mainWindow.webContents.send(IPC.navigate, route);
-  }
-}
-
-function showUsageNotification(alert: TriggeredUsageAlert): void {
-  if (!Notification.isSupported()) return;
-  if (!usageAlertDeliveryLog.allow(alert)) return;
-  const content = createUsageAlertNotification(alert);
-  const notification = new Notification({
-    ...content,
-    icon: runtimeIconPath("usageatlas.png")
-  });
-  const release = (): void => {
-    activeUsageNotifications.delete(notification);
-  };
-  notification.once("click", () => showWindow("limits"));
-  notification.once("close", release);
-  activeUsageNotifications.add(notification);
-  notification.show();
-}
-
-function scheduleBackgroundUsageCheck(delayMs = 180_000): void {
-  if (isQuitting) return;
-  if (usageCheckTimer) clearTimeout(usageCheckTimer);
-  usageCheckTimer = setTimeout(() => void runBackgroundUsageCheck(), delayMs);
-  usageCheckTimer.unref();
-}
-
-async function runBackgroundUsageCheck(): Promise<void> {
-  let nextDelayMs = 60_000;
-  try {
-    const state = await dashboard.get();
-    nextDelayMs = Math.max(30, Math.min(state.snapshot?.staleAfterSeconds ?? 180, 300)) * 1_000;
-  } catch {
-    // The next scheduled check retries without surfacing provider details in logs.
-  } finally {
-    scheduleBackgroundUsageCheck(nextDelayMs);
-  }
-}
-
-function createTray(): void {
-  const image = process.platform === "win32"
-    ? loadWindowsIcon()
-    : loadRuntimeLogo().resize({
-        width: process.platform === "darwin" ? 18 : 22,
-        height: process.platform === "darwin" ? 18 : 22,
-        quality: "best"
-      });
-  tray = new Tray(image);
-  tray.setToolTip("UsageAtlas");
-  updateTrayMenu();
-  if (process.platform !== "darwin") {
-    tray.on("click", () => showWindow("day"));
-  }
-}
-
-function updateTrayMenu(snapshot: DashboardSnapshot | null = lastTraySnapshot): void {
-  if (snapshot) lastTraySnapshot = snapshot;
-  if (!tray || tray.isDestroyed()) return;
-
-  const { limitOrder, trayLimits } = preferences.get();
-  const labels = snapshot ? trayLimitLabels(snapshot, limitOrder, trayLimits) : [];
-  const limitRows: MenuItemConstructorOptions[] = snapshot
-    ? labels.length > 0
-      ? labels.map((label) => ({ label, enabled: false }))
-      : [{ label: "No limits switched on", enabled: false }]
-    : [{ label: "Loading available limits...", enabled: false }];
-
-  const updateRows: MenuItemConstructorOptions[] = installPendingUpdate
-    ? [
-        { label: "Restart to install update", click: () => installPendingUpdate?.() },
-        { type: "separator" }
-      ]
-    : [];
-
-  tray.setContextMenu(Menu.buildFromTemplate([
-    { label: "Available limits", enabled: false },
-    ...limitRows,
-    { type: "separator" },
-    ...updateRows,
-    { label: "Open UsageAtlas", click: () => showWindow("day") },
-    { label: "View all limits", click: () => showWindow("limits") },
-    {
-      label: "Refresh usage",
-      click: () => {
-        void dashboard.refresh(true);
-      }
-    },
-    { type: "separator" },
-    { label: "Settings", click: () => showWindow("settings") },
-    { label: "Diagnostics", click: () => showWindow("diagnostics") },
-    { type: "separator" },
-    { label: "Quit", click: () => { isQuitting = true; app.quit(); } }
-  ]));
+function assertTrustedSender(event: IpcMainInvokeEvent): void {
+  const frame = event.senderFrame;
+  if (!frame || frame !== frame.top || !trustedRendererUrl(frame.url)) throw new Error("Untrusted IPC sender.");
 }
 
 function registerIPC(): void {
-  ipcMain.handle(IPC.getProviderCredentials, event => {
+  ipcMain.handle(IPC.activityWatchData, (event, range: unknown) => {
     assertTrustedSender(event);
-    return providerCredentials.statuses();
+    return readActivityWatchData(range);
   });
-  ipcMain.handle(IPC.setProviderCredential, async (event, id: unknown, raw: unknown) => {
+  ipcMain.handle(IPC.saveActivityWatchExport, async (event, json: unknown) => {
     assertTrustedSender(event);
-    if (!isQuotaProvider(id)) throw new Error("Unsupported provider connection.");
-    const credential = validateProviderCredential(id, raw);
-    const state = await dashboard.setProviderEnabled(id, credential !== null, async () => {
-      providerCredentials.save(id, credential);
-      await engine.updateConfig({ provider: id, credential: credential ? { ...credential } : null });
-      preferences.update({ providerEnabled: { ...preferences.get().providerEnabled, [id]: credential !== null } });
-    });
-    if (state.error) throw new Error(state.error);
-    return providerCredentials.statuses();
-  });
-  ipcMain.handle(IPC.getUpdateState, (event) => {
-    assertTrustedSender(event);
-    return updates.getState();
-  });
-  ipcMain.handle(IPC.checkForUpdates, (event) => {
-    assertTrustedSender(event);
-    return updates.check();
-  });
-  ipcMain.handle(IPC.installUpdate, async (event) => {
-    assertTrustedSender(event);
-    if (updates.getState().status === "ready" && installPendingUpdate) installPendingUpdate();
-    else if (updates.getState().status === "available") await shell.openExternal(DOWNLOAD_PAGE_URL);
-    else throw new Error("No update is ready to install.");
-  });
-  ipcMain.handle(IPC.cloudStatus, (event) => {
-    assertTrustedSender(event);
-    return cloudAccount.status();
-  });
-  ipcMain.handle(IPC.cloudAction, async (event, action: unknown, options: unknown) => {
-    assertTrustedSender(event);
-    if (action === "sign-in") await cloudAccount.signIn();
-    else if (action === "sign-out") await cloudAccount.signOut();
-    else if (action === "save" || action === "restore") await cloudAccount.operation(action);
-    else if (action === "refresh-profile") await cloudAccount.refreshProfile();
-    else if (action === "automatic" && options && typeof options === "object" && "enabled" in options && typeof options.enabled === "boolean") {
-      await cloudAccount.operation(action, { enabled: options.enabled });
-    } else if (action === "resolve" && options && typeof options === "object" && "recordId" in options && typeof options.recordId === "string" && "choice" in options && (options.choice === "local" || options.choice === "cloud")) {
-      await cloudAccount.operation(action, { recordId: options.recordId, choice: options.choice });
-    } else throw new Error("Invalid cloud action.");
-    return cloudAccount.status();
-  });
-  ipcMain.handle(IPC.checkHandle, (event, handle: unknown) => {
-    assertTrustedSender(event);
-    if (typeof handle !== "string") throw new Error("Invalid handle.");
-    return cloudAccount.handleAvailable(handle);
-  });
-  ipcMain.handle(IPC.getLeaderboard, (event) => {
-    assertTrustedSender(event);
-    return leaderboard.glance();
-  });
-  // The window refuses every permission, including the web clipboard.
-  ipcMain.handle(IPC.copyText, (event, text: unknown) => {
-    assertTrustedSender(event);
-    if (typeof text !== "string" || !text || text.length > 4096) throw new Error("Invalid text.");
-    clipboard.writeText(text);
-  });
-  ipcMain.handle(IPC.copyImage, (event, png: unknown) => {
-    assertTrustedSender(event);
-    clipboard.writeImage(sharedImage(png));
-  });
-  ipcMain.handle(IPC.saveImage, async (event, png: unknown, fileName: unknown) => {
-    assertTrustedSender(event);
-    const image = sharedImage(png);
-    if (typeof fileName !== "string" || !/^[a-z0-9-]{1,80}\.png$/u.test(fileName)) throw new Error("Invalid file name.");
+    if (typeof json !== "string" || json.length > 15 * 1024 * 1024) throw new Error("The activity export is too large.");
+    try {
+      const parsed: unknown = JSON.parse(json);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Invalid export data.");
+    } catch {
+      throw new Error("The activity export is not valid JSON.");
+    }
     const owner = BrowserWindow.fromWebContents(event.sender);
     const options: Electron.SaveDialogOptions = {
-      title: "Save image",
-      defaultPath: path.join(app.getPath("downloads"), fileName),
-      filters: [{ name: "PNG image", extensions: ["png"] }]
+      title: "Export device activity summary",
+      defaultPath: path.join(app.getPath("downloads"), "usageatlas-device-activity.json"),
+      filters: [{ name: "JSON summary", extensions: ["json"] }]
     };
     const result = owner ? await dialog.showSaveDialog(owner, options) : await dialog.showSaveDialog(options);
     if (result.canceled || !result.filePath) return false;
-    writeFileSync(result.filePath, image.toPNG());
+    writeFileSync(result.filePath, json, "utf8");
     return true;
   });
-  ipcMain.handle(IPC.trackGrowthEvent, (event, name: unknown, properties: unknown) => {
+  ipcMain.handle(IPC.getUpdateState, event => {
     assertTrustedSender(event);
-    if (!isGrowthEvent(name, properties)) throw new Error("Invalid analytics event.");
-    telemetry.capture(name, properties as Record<string, string>);
+    return updater.getState();
   });
-  ipcMain.handle(IPC.snapshot, (event) => {
+  ipcMain.handle(IPC.checkForUpdates, event => {
     assertTrustedSender(event);
-    return dashboard.get();
+    return updater.check();
   });
-  ipcMain.handle(IPC.refreshAll, (event) => {
+  ipcMain.handle(IPC.installUpdate, async event => {
     assertTrustedSender(event);
-    return dashboard.refresh(true);
+    if (updater.getState().status === "ready" && installPendingUpdate) installPendingUpdate();
+    else if (updater.getState().status === "available") await shell.openExternal(DOWNLOAD_PAGE_URL);
+    else throw new Error("No update is ready to install.");
   });
-  ipcMain.handle(IPC.setProviderEnabled, async (event, providerID: unknown, enabled: unknown) => {
-    assertTrustedSender(event);
-    if (typeof providerID !== "string" || !/^[a-z0-9-]{1,64}$/u.test(providerID)) {
-      throw new Error("Invalid provider identifier");
-    }
-    if (typeof enabled !== "boolean") throw new Error("Invalid provider state");
-    const current = preferences.get().providerEnabled;
-    preferences.update({ providerEnabled: { ...current, [providerID]: enabled } });
-    return dashboard.setProviderEnabled(providerID, enabled);
-  });
-  ipcMain.handle(IPC.getPreferences, (event) => {
-    assertTrustedSender(event);
-    return preferences.get();
-  });
-  ipcMain.handle(IPC.updatePreferences, (event, patch: unknown) => {
-    assertTrustedSender(event);
-    if (!isPreferencePatch(patch)) throw new Error("Invalid preferences update");
-    const previousAnalytics = preferences.get().anonymousAnalytics;
-    const nextPreferences = preferences.update(patch);
-    if (previousAnalytics !== nextPreferences.anonymousAnalytics) {
-      telemetry.setEnabled(nextPreferences.anonymousAnalytics);
-    }
-    updateTrayMenu();
-    return nextPreferences;
-  });
-  ipcMain.handle(IPC.getCustomBackground, (event) => {
-    assertTrustedSender(event);
-    return customBackgroundUrl();
-  });
-  ipcMain.handle(IPC.chooseCustomBackground, async (event) => {
-    assertTrustedSender(event);
-    const owner = BrowserWindow.fromWebContents(event.sender);
-    const options: Electron.OpenDialogOptions = {
-      title: "Choose a background image",
-      properties: ["openFile"],
-      filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "webp"] }]
-    };
-    const result = owner
-      ? await dialog.showOpenDialog(owner, options)
-      : await dialog.showOpenDialog(options);
-    if (result.canceled || !result.filePaths[0]) return null;
-
-    const sourcePath = result.filePaths[0];
-    if (statSync(sourcePath).size > MAX_BACKGROUND_FILE_SIZE) {
-      throw new Error("Choose an image smaller than 25 MB.");
-    }
-    const image = nativeImage.createFromPath(sourcePath);
-    if (image.isEmpty()) throw new Error("The selected file is not a supported image.");
-
-    const encodedImage = image.toJPEG(90);
-    writeFileSync(customBackgroundPath(), encodedImage, { mode: 0o600 });
-    const nextPreferences = preferences.update({
-      backgroundImage: "custom",
-      customBackgroundName: path.basename(sourcePath)
-    });
-    const imageUrl = customBackgroundUrl();
-    if (!imageUrl) throw new Error("The background image could not be saved.");
-    return { preferences: nextPreferences, imageUrl };
-  });
-  ipcMain.handle(IPC.getDiagnostics, (event) => {
-    assertTrustedSender(event);
-    return engine.getDiagnostics();
-  });
-  ipcMain.handle(IPC.openExternal, (event, url: unknown) => {
-    assertTrustedSender(event);
-    if (typeof url !== "string" || !isAllowedExternal(url)) return false;
-    return shell.openExternal(url).then(() => true);
-  });
-}
-
-/** Reports the share of installs with a public profile once per launch, and each publish seen. */
-function reportProfile(accountId: string, profile: KnownProfileStatus): void {
-  const previous = preferences.recordProfileState(accountId, profile.state);
-  if (!profileStatusReported) {
-    profileStatusReported = true;
-    telemetry.capture("profile_status_checked", { state: profile.state });
-  }
-  if (profile.state === "public" && previous !== null && previous !== "public")
-    telemetry.capture("profile_published", { previous_state: previous });
-}
-
-/** Reports once per launch how many enabled tools the first full read found usage for. */
-function reportUsageScan(snapshot: DashboardSnapshot): void {
-  if (usageScanReported) return;
-  usageScanReported = true;
-  const enabled = snapshot.providers.filter(provider => provider.enabled);
-  telemetry.capture("desktop_usage_scanned", {
-    tools_enabled: enabled.length,
-    tools_with_usage: enabled.filter(providerHasUsage).length,
-    tools_failed: enabled.filter(provider => provider.error).length
-  });
-}
-
-function assertTrustedSender(event: IpcMainInvokeEvent): void {
-  const frame = event.senderFrame;
-  if (!frame || frame !== frame.top || !isTrustedRendererURL(frame.url)) {
-    throw new Error("Untrusted IPC sender");
-  }
-}
-
-function isTrustedRendererURL(value: string): boolean {
-  try {
-    const candidate = new URL(value);
-    if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-      return candidate.origin === new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL).origin;
-    }
-    return candidate.protocol === "app:" && candidate.hostname === "usageatlas";
-  } catch {
-    return false;
-  }
-}
-
-/** A PNG the renderer drew, decoded and re-encoded before it reaches the clipboard or disk. */
-function sharedImage(value: unknown): Electron.NativeImage {
-  if (typeof value !== "string" || !value.startsWith(PNG_DATA_URL) || value.length > MAX_SHARE_IMAGE_LENGTH) throw new Error("Invalid image.");
-  const image = nativeImage.createFromBuffer(Buffer.from(value.slice(PNG_DATA_URL.length), "base64"));
-  if (image.isEmpty()) throw new Error("Invalid image.");
-  return image;
-}
-
-function isAllowedExternal(value: string): boolean {
-  try {
-    const candidate = new URL(value);
-    return candidate.protocol === "https:" && allowedExternalHosts.has(candidate.hostname);
-  } catch {
-    return false;
-  }
-}
-
-function isPreferencePatch(value: unknown): value is Partial<DesktopPreferences> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const patch = value as Record<string, unknown>;
-  if (Object.keys(patch).some((key) => !["launchAtLogin", "minimizeToTray", "anonymousAnalytics", "backgroundImage", "usageAlerts", "limitOrder", "trayLimits"].includes(key))) {
-    return false;
-  }
-  return (patch.launchAtLogin === undefined || typeof patch.launchAtLogin === "boolean")
-    && (patch.minimizeToTray === undefined || typeof patch.minimizeToTray === "boolean")
-    && (patch.anonymousAnalytics === undefined || typeof patch.anonymousAnalytics === "boolean")
-    && (patch.backgroundImage === undefined || isBackgroundImagePreference(patch.backgroundImage))
-    && (patch.limitOrder === undefined || (
-      Array.isArray(patch.limitOrder)
-      && patch.limitOrder.length <= 128
-      && patch.limitOrder.every(isLimitKey)
-    ))
-    && (patch.trayLimits === undefined || isTrayLimitPatch(patch.trayLimits))
-    && (patch.usageAlerts === undefined || isUsageAlertPreferences(patch.usageAlerts));
-}
-
-function isTrayLimitPatch(value: unknown): boolean {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const entries = Object.entries(value as Record<string, unknown>);
-  return entries.length <= 128
-    && entries.every(([key, shown]) => isLimitKey(key) && typeof shown === "boolean");
 }
 
 async function registerApplicationProtocol(): Promise<void> {
   const rendererRoot = path.resolve(__dirname, "../renderer", MAIN_WINDOW_VITE_NAME);
-  protocol.handle("app", (request) => {
+  protocol.handle("app", request => {
     const parsed = new URL(request.url);
     if (parsed.hostname !== "usageatlas") return new Response("Not found", { status: 404 });
-    if (parsed.pathname === "/custom-background") {
-      const imagePath = customBackgroundPath();
-      return existsSync(imagePath)
-        ? net.fetch(pathToFileURL(imagePath).toString())
-        : new Response("Not found", { status: 404 });
-    }
     if (MAIN_WINDOW_VITE_DEV_SERVER_URL) return new Response("Not found", { status: 404 });
     const relativePath = decodeURIComponent(parsed.pathname).replace(/^\/+/, "") || "index.html";
     const requestedPath = path.resolve(rendererRoot, relativePath);
-    if (requestedPath !== rendererRoot && !requestedPath.startsWith(`${rendererRoot}${path.sep}`)) {
-      return new Response("Not found", { status: 404 });
-    }
+    if (requestedPath !== rendererRoot && !requestedPath.startsWith(`${rendererRoot}${path.sep}`)) return new Response("Not found", { status: 404 });
     return net.fetch(pathToFileURL(requestedPath).toString());
   });
 }
 
-/**
- * Squirrel.Mac cannot replace an app running from the disk image or a
- * translocated download, and the login item would point at a path that goes
- * away. Returns true when the app is moving and will relaunch from Applications.
- */
-async function offerMoveToApplications(): Promise<boolean> {
-  if (process.platform !== "darwin" || !app.isPackaged || app.isInApplicationsFolder()) return false;
-  if (process.env.USAGEATLAS_SMOKE_TEST === "1") return false;
-  const { response } = await dialog.showMessageBox({
-    type: "question",
-    buttons: ["Move to Applications", "Not Now"],
-    defaultId: 0,
-    cancelId: 1,
-    message: "Move UsageAtlas to your Applications folder?",
-    detail: "Running from Applications keeps updates and launch at login working."
-  });
-  if (response !== 0) return false;
-  try {
-    return app.moveToApplicationsFolder();
-  } catch (error) {
-    dialog.showErrorBox("UsageAtlas could not be moved", error instanceof Error ? error.message : "Drag it to the Applications folder in Finder.");
-    return false;
-  }
-}
-
 if (squirrelStartup) {
   app.quit();
-} else void app.whenReady().then(async () => {
-  if (await offerMoveToApplications()) return;
-  if (process.platform === "darwin") app.dock?.setIcon(loadRuntimeLogo());
-  session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
-  session.defaultSession.setPermissionCheckHandler(() => false);
-  await registerApplicationProtocol();
-  preferences = new PreferenceStore();
-  providerCredentials = new ProviderCredentialStore(path.join(app.getPath("userData"), "provider-credentials"));
-  telemetry = new DesktopTelemetry(preferences);
-  engine = new EngineManager(
-    () => new UtilityEngineTransport(
-      path.join(__dirname, "engine-entry.js"),
-      path.join(app.getPath("userData"), "history.sqlite")
-    )
-  );
-  engine.onStatus((status) => mainWindow?.webContents.send(IPC.engineStatus, status));
-  dashboard = new DashboardSession(engine, state => {
-    if (isQuitting) return;
-    lastTraySnapshot = state.snapshot;
-    if (!state.snapshot) usageAlertEvaluator = new UsageAlertEvaluator();
-    updateTrayMenu(state.snapshot);
-    mainWindow?.webContents.send(IPC.snapshotUpdated, state);
-  }, snapshot => {
-    const alerts = usageAlertEvaluator.evaluate(snapshot, preferences.get().usageAlerts);
-    for (const alert of alerts) showUsageNotification(alert);
-    reportUsageScan(snapshot);
-  });
-  engine.onProgress(progress => dashboard.progress(progress));
-  engine.onImportProgress(message => dashboard.importProgress(message.accountId, message.progress));
-  cloudAccount = new CloudAccount(engine, (accountId, configure, reconnect) =>
-    dashboard.configure(accountId, configure, reconnect), reportProfile, () => telemetry.capture("desktop_signed_in"));
-  engine.onHistoryChanged(() => dashboard.historyChanged());
-  await cloudAccount.initialize().catch(() => undefined);
-  await configureProviderCredentials(providerCredentials, engine);
-  engine.onStatus(status => {
-    if (status === "ready") void configureProviderCredentials(providerCredentials, engine).then(() => engine.applyProviderPreferences(preferences.get().providerEnabled))
-      .then(() => cloudAccount.reconnect()).catch(() => undefined);
-  });
-  await engine.applyProviderPreferences(preferences.get().providerEnabled);
-  dashboard.activate();
-  registerIPC();
-  createTray();
-  mainWindow = createWindow();
-  telemetry.capture("desktop_app_opened", process.platform === "darwin" ? { in_applications_folder: app.isInApplicationsFolder() } : {});
-  if (cloudAccount.profileStatus().state === "signed-out") {
-    profileStatusReported = true;
-    telemetry.capture("profile_status_checked", { state: "signed-out" });
-  }
-  // The window asks again when it comes back to front. No timer: each check wakes the cloud database.
-  void cloudAccount.refreshProfile();
-  updates = configureAutoUpdates({
-    capture: (event) => telemetry.capture(event),
-    onStateChange: (state) => {
-      if (state.status === "error") {
-        if (installPendingUpdate) isQuitting = false;
-        installPendingUpdate = null;
-        updateTrayMenu();
-      }
-      mainWindow?.webContents.send(IPC.updateStateChanged, state);
-    },
-    onUpdateReady: (install) => {
-      // The close handler keeps the window alive when minimize-to-tray is on,
-      // which would stall the Squirrel restart.
-      installPendingUpdate = () => {
-        if (isQuitting) return;
-        isQuitting = true;
-        try { install(); } catch (error) { isQuitting = false; throw error; }
-      };
-      updateTrayMenu();
-    }
-  });
-  scheduleBackgroundUsageCheck();
-  if (process.env.USAGEATLAS_SMOKE_TEST === "1") void runPackagedSmokeTest(mainWindow);
-  app.on("activate", () => showWindow());
-});
-
-app.on("before-quit", () => {
-  isQuitting = true;
-  if (usageCheckTimer) clearTimeout(usageCheckTimer);
-  usageCheckTimer = null;
-  cloudAccount?.close();
-  dashboard?.close();
-  void engine?.shutdown();
-  void telemetry?.shutdown();
-});
-
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin" && !preferences?.get().minimizeToTray) app.quit();
-});
-
-async function runPackagedSmokeTest(window: BrowserWindow): Promise<void> {
-  try {
-    if (!app.isPackaged) throw new Error("Packaged smoke mode requires a packaged application");
-    await waitForRenderer(window);
-    const rendererReady = await window.webContents.executeJavaScript(`(async () => {
-      if (!window.usageAtlas) return false;
-      for (let attempt = 0; attempt < 100 && !document.querySelector("#root")?.childElementCount; attempt++) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      if (!document.querySelector("#root")?.childElementCount) return false;
-      const state = await window.usageAtlas.getSnapshot();
-      const preferences = await window.usageAtlas.getPreferences();
-      return Number.isInteger(state.revision) && preferences.anonymousAnalytics === false;
-    })()`);
-    if (!rendererReady) throw new Error("Renderer or preload API did not initialize");
-    await engine.getSnapshot();
-    await engine.shutdown();
-    tray?.destroy();
-    window.destroy();
-    app.exit(0);
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : "Packaged smoke test failed");
-    tray?.destroy();
-    if (!window.isDestroyed()) window.destroy();
-    app.exit(1);
-  }
-}
-
-async function waitForRenderer(window: BrowserWindow): Promise<void> {
-  if (window.webContents.getURL() && !window.webContents.isLoadingMainFrame()) return;
-  await new Promise<void>((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      cleanup();
-      reject(new Error("Renderer smoke test timed out"));
-    }, 15_000);
-    timeout.unref();
-    const cleanup = (): void => {
-      clearTimeout(timeout);
-      window.webContents.off("did-finish-load", handleLoaded);
-      window.webContents.off("did-fail-load", handleFailed);
-    };
-    const handleLoaded = (): void => {
-      cleanup();
-      resolve();
-    };
-    const handleFailed = (
-      _event: Electron.Event,
-      errorCode: number,
-      errorDescription: string,
-      validatedURL: string,
-      isMainFrame: boolean
-    ): void => {
-      if (!isMainFrame) return;
-      cleanup();
-      reject(new Error(`Renderer failed to load ${validatedURL}: ${errorCode} ${errorDescription}`));
-    };
-    window.webContents.once("did-finish-load", handleLoaded);
-    window.webContents.on("did-fail-load", handleFailed);
+} else {
+  void app.whenReady().then(async () => {
+    if (process.platform === "darwin") app.dock?.setIcon(runtimeLogo());
+    session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
+    session.defaultSession.setPermissionCheckHandler(() => false);
+    await registerApplicationProtocol();
+    updater = configureAutoUpdates({
+      onStateChange: state => mainWindow?.webContents.send(IPC.updateStateChanged, state),
+      onUpdateReady: install => { installPendingUpdate = install; }
+    });
+    registerIPC();
+    mainWindow = createWindow();
+    app.on("activate", () => {
+      if (!mainWindow || mainWindow.isDestroyed()) mainWindow = createWindow();
+      else { mainWindow.show(); mainWindow.focus(); }
+    });
+  }).catch(error => {
+    console.error("UsageAtlas could not start.", error);
+    app.quit();
   });
 }
+
+app.on("window-all-closed", () => { if (process.platform !== "darwin") app.quit(); });
