@@ -53,7 +53,7 @@
 .activity-switch input:checked::after, .activity-preference input:checked::after { transform: translateX(17px); background: var(--background); }
 
 /* Same surface, edge, sheen and material filter as atlas-primary-card. */
-.activity-glass-card { min-width: 0; position: relative; border: 1px solid var(--atlas-edge); border-radius: 16px; background: var(--atlas-card); }
+.activity-glass-card { min-width: 0; position: relative; border: 1px solid var(--atlas-edge); border-radius: 16px; background: var(--atlas-glass-sheen), var(--atlas-card); box-shadow: inset 0 1px 0 var(--atlas-glass-inner-edge); -webkit-backdrop-filter: var(--atlas-glass-filter); backdrop-filter: var(--atlas-glass-filter); }
 .activity-hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.65fr); gap: 14px; }
 .activity-hero { min-height: 276px; padding: 28px; display: flex; flex-direction: column; align-items: flex-start; }
 .activity-hero h1 { font-size: 29px; }
