@@ -68,7 +68,7 @@ export function Tooltip({
             mass: 0.6,
           }}
           className={cn(
-            "pointer-events-none absolute z-10 rounded-md border px-2 py-1 shadow-sm",
+            "pointer-events-none absolute z-10 w-max rounded-md border px-2 py-1 shadow-sm",
             VARIANT[variant]
           )}
         >
@@ -81,11 +81,11 @@ export function Tooltip({
             {items.map((item) => (
               <div
                 key={item.name}
-                className="flex items-center gap-1.5 font-mono text-[11px] text-popover-foreground tabular-nums"
+                className="flex flex-nowrap items-center gap-1.5 whitespace-nowrap font-mono text-[11px] text-popover-foreground tabular-nums"
                 style={{ opacity: item.dimmed ? 0.4 : 1 }}
               >
                 <span
-                  className="size-2 rounded-[1px]"
+                  className="size-2 shrink-0 rounded-[1px]"
                   style={{ backgroundColor: rgb(item.seed.fill) }}
                 />
                 <span className="text-muted-foreground">{item.label}</span>
