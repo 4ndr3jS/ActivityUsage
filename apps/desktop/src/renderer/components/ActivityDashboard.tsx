@@ -1,43 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
 import type { ActivityDevice, ActivityWatchRecord, ActivityWatchSnapshot } from "../../shared/desktop-api";
-
 import { ChevronLeftIcon, ChevronRightIcon, RefreshIcon, ShareIcon } from "../icons";
-
 import { Area } from "./dither-kit/area";
-
 import { AreaChart } from "./dither-kit/area-chart";
-
 import { Bar } from "./dither-kit/bar";
-
 import { BarChart } from "./dither-kit/bar-chart";
-
 import { Grid } from "./dither-kit/grid";
-
 import { Pie } from "./dither-kit/pie";
-
 import { PieChart } from "./dither-kit/pie-chart";
-
 import { Sparkline } from "./dither-kit/sparkline";
-
 import { Tooltip } from "./dither-kit/tooltip";
-
 import { XAxis } from "./dither-kit/x-axis";
-
 import { YAxis } from "./dither-kit/y-axis";
-
 import type { DitherColor } from "./dither-kit/palette";
-
 import { createActivityPeriod } from "../activity-period";
-
 import "./activity-dashboard.css";
 
 type RangeDays = 1 | 7 | 30 | 90 | 365;
-
 export type ActivityView = "overview" | "history" | "breakdown" | "insights" | "sources" | "settings";
-
 type DeviceFilter = "all" | ActivityDevice;
-
 const EMPTY_EVENTS: ActivityWatchRecord[] = [];
 
 interface Period {
@@ -391,14 +372,28 @@ function SectionHeading({ eyebrow, title, detail }: { eyebrow: string; title: st
   return <div className="activity-section-heading"><div><p className="activity-eyebrow">{eyebrow}</p><h2>{title}</h2></div>{detail && <span>{detail}</span>}</div>;
 }
 
-function ActivitySettingsView(_props: {
+function ActivitySettingsView({ showTitles, includeLabels, autoRefresh, onShowTitles, onIncludeLabels, onAutoRefresh }: {
   showTitles: boolean;
   includeLabels: boolean;
   autoRefresh: boolean;
   onShowTitles(value: boolean): void;
   onIncludeLabels(value: boolean): void;
   onAutoRefresh(value: boolean): void;
-}): React.JSX.Element { return <></>; }
+}): React.JSX.Element {
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "System default";
+  return <div className="activity-settings-grid">
+    <section className="activity-glass-card activity-privacy-card"><p className="activity-eyebrow">PRIVACY</p><h2>Local activity controls</h2>
+      <PreferenceToggle checked={showTitles} label="Show window titles" note="Window titles may reveal document or page names." onChange={onShowTitles} />
+      <PreferenceToggle checked={includeLabels} label="Include app labels in exports" note="Off by default; exports contain totals and daily activity only." onChange={onIncludeLabels} />
+      <PreferenceToggle checked={autoRefresh} label="Refresh every five minutes" note="Reads the local ActivityWatch API while this page is open." onChange={onAutoRefresh} />
+      <p className="activity-privacy-note">ActivityWatch data stays in its local database. UsageAtlas does not upload device activity.</p>
+    </section>
+    <section className="activity-glass-card activity-privacy-card"><p className="activity-eyebrow">DISPLAY</p><h2>Reporting time zone</h2>
+      <div className="activity-timezone-row"><span>System time zone</span><strong>{timeZone}</strong></div>
+      <p className="activity-privacy-note">Day boundaries and chart labels use your computer’s current time zone.</p>
+    </section>
+  </div>;
+}
 
 function MetricCard({ title, value, note, delta, spark, tone = "green" }: { title: string; value: string; note: string; delta?: string | null; spark?: number[]; tone?: DitherColor }): React.JSX.Element {
   return <article className="activity-glass-card activity-metric-card"><div className="activity-metric-copy"><span>{title}</span><strong title={value}>{value}</strong><small>{delta && <em>{delta}</em>}{note}</small></div>
@@ -430,6 +425,10 @@ function AppList({ apps, title, subtitle }: { apps: AppActivity[]; title: string
   return <section className="activity-glass-card activity-app-list"><div className="activity-chart-panel__header"><div><h3>{title}</h3><p>{subtitle}</p></div></div>
     {apps.length ? <ol>{apps.map((app, index) => <li key={app.label}><span className="activity-app-rank">{String(index + 1).padStart(2, "0")}</span><div className="activity-app-detail"><div className="activity-app-row"><span title={app.label}>{app.label}</span><b>{formatDuration(app.seconds)}</b></div><div className="activity-app-track"><i style={{ width: `${app.seconds / maximum * 100}%` }} /></div><small>{app.events.toLocaleString()} recorded events</small></div></li>)}</ol> : <p className="activity-empty">No app-level events in this range.</p>}
   </section>;
+}
+
+function PreferenceToggle({ checked, label, note, onChange }: { checked: boolean; label: string; note: string; onChange(value: boolean): void }): React.JSX.Element {
+  return <label className="activity-preference"><span><strong>{label}</strong><small>{note}</small></span><input type="checkbox" checked={checked} onChange={event => onChange(event.target.checked)} /></label>;
 }
 
 function labelPeriod(period: Period, days: RangeDays): string {
