@@ -11,6 +11,7 @@ import {
   resample,
 } from "./dither-paint"
 import { rgb } from "./palette"
+import { scheduleCanvas, type CanvasScheduler } from "./canvas-scheduler"
 
 type Star = { key: string; xi: number; depth: number; phase: number }
 type Surface = { top: number[]; floor: number[] }
@@ -26,11 +27,11 @@ type LoopArgs = {
 }
 
 /**
- * The requestAnimationFrame paint loop — eases each series toward its target
+ * On-demand painter — eases each series toward its target
  * surface, paints the dither fill (with the entrance reveal), then layers the
- * crosshair marker and winking stars on top. Lives outside the component so the
+ * crosshair marker and static glints on top. Lives outside the component so the
  * component stays small and this hot closure isn't re-created on every render.
- * Returns a cleanup that cancels the loop.
+ * Returns a scheduler that pauses when idle, hidden, or outside the viewport.
  */
 function startCartesianLoop({
   canvas,
@@ -40,7 +41,7 @@ function startCartesianLoop({
   state,
   targets,
   stars,
-}: LoopArgs): (() => void) | undefined {
+}: LoopArgs): CanvasScheduler | undefined {
   const c = canvas.getContext("2d")
   if (!c || cols <= 0 || rows <= 0) return undefined
   canvas.width = cols
@@ -102,9 +103,6 @@ function startCartesianLoop({
     })
   }
 
-  let raf = 0
-  let tick = 0
-  let last = 0
   let animStart = 0
   let lastProg = -1
   let lastRevision = state.current.revision
@@ -114,19 +112,10 @@ function startCartesianLoop({
   let lastPaintSig = ""
   let lastSelected: string | null | undefined = Symbol() as never
 
-  const draw = (now: number) => {
-    raf = requestAnimationFrame(draw)
+  const draw = (now: number, dirty: boolean) => {
     const s = state.current
     if (!s.ready) return
-    // Keep the bloom layer in sync with the crisp canvas while it's active.
-    if (bloomCtx) {
-      const on =
-        s.bloom !== "off" && (!s.bloomOnHover || s.isMouseInChart || s.hovered)
-      if (on) {
-        bloomCtx.clearRect(0, 0, cols, rows)
-        bloomCtx.drawImage(canvas, 0, 0)
-      }
-    }
+    if (dirty) needsFill = true
     const tgt = targets.current
     if (s.revision !== lastRevision) {
       lastRevision = s.revision
@@ -190,7 +179,6 @@ function startCartesianLoop({
     // Live hover wins; the controlled markerIndex (e.g. a committed point)
     // is the fallback shown when nothing is hovered.
     const marker = s.hoverIndex != null ? s.hoverIndex : s.markerIndex
-    const winkDue = !reduce && now - last >= 100
     // Repaint when a tweak-driven paint input changes (variant, stacking) so
     // the panel updates the fill live — without resetting the entrance reveal.
     const paintSig = `${s.stackType}|${s.configKeys
@@ -205,8 +193,7 @@ function startCartesianLoop({
       !(
         moving ||
         settling ||
-        winkDue ||
-        marker != null ||
+        needsFill ||
         progChanged ||
         sigChanged
       )
@@ -215,10 +202,6 @@ function startCartesianLoop({
     if (progChanged) {
       lastProg = prog
       needsFill = true
-    }
-    if (winkDue) {
-      last = now
-      tick += 1
     }
 
     // Reveal front (left-to-right) — stars + crosshair stay behind it so
@@ -262,16 +245,17 @@ function startCartesianLoop({
       const top = cur.top[sx] ?? 0
       const floor = cur.floor[sx] ?? rows - 1
       const sy = Math.round(top + star.depth * (floor - top))
-      const tw = reduce ? 0.85 : (Math.sin((tick + star.phase) * 0.35) + 1) / 2
+      // Keep the texture's glints static so an idle chart needs no repaint.
+      const tw = reduce ? 0.85 : (Math.sin(star.phase * 0.35) + 1) / 2
       const lift = tw * (0.7 + 0.3 * intensity)
       if (lift < 0.55 || sy < 0 || sy >= rows) continue
-      // Sparkles glint in the series colour via opacity (the `lift` wink)
+      // Sparkles glint in the series colour via opacity
       // rather than a lighter shade — so they never read as stray white
       // pixels on a light background.
       const starColor = s.seedOf(star.key).fill
       c.fillStyle = rgb(starColor, 1, lift)
       c.fillRect(sx, sy, 1, 1)
-      // At the peak of a wink the star flares into a 4-point glint.
+      // The brightest stars flare into a 4-point glint.
       if (tw > 0.9) {
         c.fillStyle = rgb(starColor, 1, lift * 0.6 * (tw - 0.9) * 10)
         c.fillRect(sx - 1, sy, 1, 1)
@@ -280,10 +264,14 @@ function startCartesianLoop({
         c.fillRect(sx, sy + 1, 1, 1)
       }
     }
+    if (bloomCtx) {
+      bloomCtx.clearRect(0, 0, cols, rows)
+      if (s.bloom !== "off") bloomCtx.drawImage(canvas, 0, 0)
+    }
+    return moving || settling || prog < 1
   }
 
-  raf = requestAnimationFrame(draw)
-  return () => cancelAnimationFrame(raf)
+  return scheduleCanvas(canvas, draw)
 }
 
 /**
@@ -291,7 +279,7 @@ function startCartesianLoop({
  * `[top, floor]` band per backing column: areas fill from their value line down
  * to their floor; lines fill only a thin glow band hugging the line. The shared
  * {@link paintColumn} renders the ordered-dither scatter, capped by the bright
- * series line, with winking stars + scrub crosshair on top.
+ * series line, with static glints + scrub crosshair on top.
  */
 export function CartesianCanvas() {
   const ctx = useChart()
@@ -351,16 +339,18 @@ export function CartesianCanvas() {
   const stateRef = useRef(ctx)
   const targetsRef = useRef(targets)
   const starsRef = useRef(stars)
+  const schedulerRef = useRef<CanvasScheduler | undefined>(undefined)
   useEffect(() => {
     stateRef.current = ctx
     targetsRef.current = targets
     starsRef.current = stars
+    schedulerRef.current?.invalidate()
   })
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    return startCartesianLoop({
+    const scheduler = startCartesianLoop({
       canvas,
       bloomCanvas: bloomRef.current,
       cols,
@@ -369,6 +359,8 @@ export function CartesianCanvas() {
       targets: targetsRef,
       stars: starsRef,
     })
+    schedulerRef.current = scheduler
+    return () => { scheduler?.dispose(); schedulerRef.current = undefined }
   }, [cols, rows])
 
   const bloomActive = ctx.bloomOnHover
