@@ -14,6 +14,7 @@ import { XAxis } from "./dither-kit/x-axis";
 import { YAxis } from "./dither-kit/y-axis";
 import type { DitherColor } from "./dither-kit/palette";
 import { createActivityPeriod } from "../activity-period";
+import { appLabel } from "../app-label";
 import "./activity-dashboard.css";
 
 type RangeDays = 1 | 7 | 30 | 90 | 365;
@@ -569,7 +570,7 @@ function clipIntervals(intervals: Interval[], start: number, end: number): Inter
 function buildApps(events: ActivityWatchRecord[], showTitles: boolean): AppActivity[] {
   const groups = new Map<string, AppActivity>();
   for (const event of events) {
-    const app = event.app || "Unlabelled application";
+    const app = appLabel(event.app);
     const label = showTitles && event.title ? `${app} · ${event.title}` : app;
     const existing = groups.get(label) ?? { label, seconds: 0, events: 0 };
     existing.seconds += event.duration;
