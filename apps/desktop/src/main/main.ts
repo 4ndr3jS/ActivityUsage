@@ -193,9 +193,14 @@ async function registerApplicationProtocol(): Promise<void> {
   });
 }
 
-if (squirrelStartup) {
+if (squirrelStartup || !app.requestSingleInstanceLock()) {
   app.quit();
 } else {
+  app.on("second-instance", () => {
+    if (mainWindow?.isMinimized()) mainWindow.restore();
+    mainWindow?.show();
+    mainWindow?.focus();
+  });
   void app.whenReady().then(async () => {
     if (process.platform === "darwin") app.dock?.setIcon(runtimeLogo());
     session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
