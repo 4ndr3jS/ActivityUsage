@@ -112,7 +112,7 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   useEffect(() => {
     if (!autoRefresh) return undefined;
     const timer = window.setInterval(() => {
-      void loadData();
+      if (!document.hidden) void loadData();
     }, 5 * 60 * 1000);
     return () => window.clearInterval(timer);
   }, [autoRefresh, loadData]);
