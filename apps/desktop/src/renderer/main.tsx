@@ -1,4 +1,3 @@
-import { Toast } from "@heroui/react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "@fontsource-variable/inter";
@@ -26,5 +25,4 @@ document.documentElement.dataset.platform = window.usageAtlas.platform;
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Missing renderer root");
-// Toasts sit outside the shell, whose glass panels would otherwise anchor them.
-createRoot(root).render(<StrictMode><App /><Toast.Provider placement="bottom end" /></StrictMode>);
+createRoot(root).render(<StrictMode><App /></StrictMode>);
