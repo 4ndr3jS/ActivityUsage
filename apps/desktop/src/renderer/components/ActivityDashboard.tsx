@@ -130,9 +130,12 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
     if (device === "phone") return { ...day, computer: 0, combined: day.phone };
     return day;
   }), [days, device]);
-  const hours = useMemo(() => buildHours(events, period.start, device), [device, events, period.start]);
-  const hourProfile = useMemo(() => buildHourProfile(events, device), [device, events]);
-  const apps = useMemo(() => buildApps(visibleEvents, showTitles), [showTitles, visibleEvents]);
+  const needsHours = view === "overview" && rangeDays === 1;
+  const needsHourProfile = view === "insights";
+  const needsApps = view === "overview" || view === "breakdown" || view === "insights";
+  const hours = useMemo(() => needsHours ? buildHours(events, period.start, device) : [], [device, events, period.start, needsHours]);
+  const hourProfile = useMemo(() => needsHourProfile ? buildHourProfile(events, device) : [], [device, events, needsHourProfile]);
+  const apps = useMemo(() => needsApps ? buildApps(visibleEvents, showTitles) : [], [showTitles, visibleEvents, needsApps]);
   const peakDay = visibleDays.reduce<DayActivity | null>((peak, day) => !peak || day.combined > peak.combined ? day : peak, null);
   const periodLabel = labelPeriod(period, rangeDays);
   const pageTitle: Record<ActivityView, string> = {
@@ -569,8 +572,10 @@ function clipIntervals(intervals: Interval[], start: number, end: number): Inter
 
 function buildApps(events: ActivityWatchRecord[], showTitles: boolean): AppActivity[] {
   const groups = new Map<string, AppActivity>();
+  const labels = new Map<string | null, string>();
   for (const event of events) {
-    const app = appLabel(event.app);
+    let app = labels.get(event.app);
+    if (!app) { app = appLabel(event.app); labels.set(event.app, app); }
     const label = showTitles && event.title ? `${app} · ${event.title}` : app;
     const existing = groups.get(label) ?? { label, seconds: 0, events: 0 };
     existing.seconds += event.duration;
