@@ -12,6 +12,7 @@ import {
 import { rgb } from "./palette"
 import { sliceAtAngle } from "./polar"
 import { usePolarChart } from "./polar-context"
+import { scheduleCanvas, type CanvasScheduler } from "./canvas-scheduler"
 
 const TOP = -Math.PI / 2
 const TAU = Math.PI * 2
@@ -30,8 +31,10 @@ export function PieCanvas() {
   const { width, height } = ctx.plot
   const { cols, rows } = backingSize(width, height)
   const state = useRef(ctx)
+  const schedulerRef = useRef<CanvasScheduler | undefined>(undefined)
   useEffect(() => {
     state.current = ctx
+    schedulerRef.current?.invalidate()
   })
 
   useEffect(() => {
@@ -51,7 +54,6 @@ export function PieCanvas() {
     const reduce = prefersReducedMotion()
     const animate = state.current.animate && !reduce
     const duration = state.current.animationDuration
-    let raf = 0
     let animStart = 0
     let lastProg = -1
     let lastRevision = state.current.revision
@@ -125,17 +127,10 @@ export function PieCanvas() {
       }
     }
 
-    const draw = (now: number) => {
-      raf = requestAnimationFrame(draw)
+    const draw = (now: number, dirty: boolean) => {
       const s = state.current
       if (!s.ready || !s.pie) return
-      if (bloomCtx) {
-        const on = s.bloom !== "off" && (!s.bloomOnHover || s.isMouseInChart)
-        if (on) {
-          bloomCtx.clearRect(0, 0, cols, rows)
-          bloomCtx.drawImage(canvas, 0, 0)
-        }
-      }
+      if (dirty) needsFill = true
       if (s.revision !== lastRevision) {
         lastRevision = s.revision
         animStart = 0
@@ -181,10 +176,16 @@ export function PieCanvas() {
       if (!needsFill) return
       paint(prog)
       needsFill = false
+      if (bloomCtx) {
+        bloomCtx.clearRect(0, 0, cols, rows)
+        if (s.bloom !== "off") bloomCtx.drawImage(canvas, 0, 0)
+      }
+      return prog < 1 || Math.abs(intensity - intensityTarget) > 0.001 || Math.abs(popEase - popTarget) > 0.001
     }
 
-    raf = requestAnimationFrame(draw)
-    return () => cancelAnimationFrame(raf)
+    const scheduler = scheduleCanvas(canvas, draw)
+    schedulerRef.current = scheduler
+    return () => { scheduler.dispose(); schedulerRef.current = undefined }
   }, [cols, rows, width, height])
 
   const bloom = bloomLayerStyle(
