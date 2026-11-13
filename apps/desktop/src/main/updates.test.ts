@@ -19,7 +19,7 @@ const argv = [...process.argv];
 beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
-  vi.stubEnv("USAGEATLAS_SMOKE_TEST", "0");
+  vi.stubEnv("ACTIVITY_USAGE_SMOKE_TEST", "0");
   Object.defineProperty(process, "platform", { value: "win32" });
   Object.assign(app, { isPackaged: true });
   autoUpdater.removeAllListeners();
@@ -88,7 +88,7 @@ describe("desktop updates", () => {
     Object.assign(app, { isPackaged: false });
     expect((await configureAutoUpdates().check()).status).toBe("unavailable");
     Object.assign(app, { isPackaged: true });
-    vi.stubEnv("USAGEATLAS_SMOKE_TEST", "1");
+    vi.stubEnv("ACTIVITY_USAGE_SMOKE_TEST", "1");
     expect((await configureAutoUpdates().check()).status).toBe("unavailable");
     expect(autoUpdater.checkForUpdates).not.toHaveBeenCalled();
     expect(vi.getTimerCount()).toBe(0);

@@ -1,4 +1,4 @@
-import type { DashboardProvider, DashboardSnapshot } from "@usageatlas/contracts";
+import type { DashboardProvider, DashboardSnapshot } from "@activityusage/contracts";
 
 /** True when SQLite (or a prior refresh) already has something worth painting. */
 export function snapshotHasCachedUsage(snapshot: DashboardSnapshot): boolean {

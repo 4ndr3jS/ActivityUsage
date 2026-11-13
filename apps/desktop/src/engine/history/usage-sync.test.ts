@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { openWritableSqlite } from "../platform/sqlite";
 import { UsageStore } from "./usage-store";
 import { UsageSync, type UsageCloud } from "./usage-sync";
-import { sameUsage, validateUsageRecord, type UsageDay, type CloudRecord } from "@usageatlas/contracts/usage";
-import fixtures from "@usageatlas/contracts/fixtures/usage-record-v1.json";
+import { sameUsage, validateUsageRecord, type UsageDay, type CloudRecord } from "@activityusage/contracts/usage";
+import fixtures from "@activityusage/contracts/fixtures/usage-record-v1.json";
 
 const HOUR = 3_600_000;
 const resources: Array<() => void> = [];

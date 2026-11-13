@@ -6,8 +6,8 @@ import { UsageSync, type UsageCloud } from "./usage-sync";
 import { identifyFact } from "./statistics-store";
 import { canReplaceSealed, extractDayPayload } from "./payload";
 import { toUsageDay } from "./usage-payload";
-import { validateUsageRecord } from "@usageatlas/contracts/usage";
-import type { UsageEventFact, UsageFact } from "@usageatlas/contracts/statistics";
+import { validateUsageRecord } from "@activityusage/contracts/usage";
+import type { UsageEventFact, UsageFact } from "@activityusage/contracts/statistics";
 
 const resources: Array<() => void> = [];
 afterEach(() => { for (const close of resources.splice(0).reverse()) close(); });

@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type { DashboardProvider } from "@usageatlas/contracts";
+import type { DashboardProvider } from "@activityusage/contracts";
 import { QuotaDetails } from "./QuotaDetails";
 import { ProviderCredentialForm } from "./ProviderCredentialForm";
 const provider: DashboardProvider = { id: "copilot", name: "GitHub Copilot", source: "provider_quota", enabled: true, analytics: null, windows: [], quotaMetrics: [

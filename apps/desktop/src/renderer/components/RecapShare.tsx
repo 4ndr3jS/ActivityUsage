@@ -1,4 +1,4 @@
-import type { DashboardSnapshot } from "@usageatlas/contracts";
+import type { DashboardSnapshot } from "@activityusage/contracts";
 import interLatin from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
 import { Button, Modal, ToggleButton, ToggleButtonGroup } from "@heroui/react";
 import { domToPng } from "modern-screenshot";

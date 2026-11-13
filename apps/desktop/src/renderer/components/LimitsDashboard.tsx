@@ -1,4 +1,4 @@
-import type { DashboardProvider, DashboardSnapshot } from "@usageatlas/contracts";
+import type { DashboardProvider, DashboardSnapshot } from "@activityusage/contracts";
 import { Button, Switch } from "@heroui/react";
 import { Reorder, useDragControls } from "motion/react";
 import { useState } from "react";

@@ -1,5 +1,5 @@
-import type { HistoryDayPayload, HistoryDayRecord, UsageTotals } from "@usageatlas/contracts";
-import { validateUsageRecord, type UsageDay } from "@usageatlas/contracts/usage";
+import type { HistoryDayPayload, HistoryDayRecord, UsageTotals } from "@activityusage/contracts";
+import { validateUsageRecord, type UsageDay } from "@activityusage/contracts/usage";
 import { describe, expect, it } from "vitest";
 import { emptyUsageTotals } from "./payload";
 import { previewModelRecovery, toUsageDay } from "./usage-payload";

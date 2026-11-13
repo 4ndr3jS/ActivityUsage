@@ -139,7 +139,7 @@ describe("background local history imports", () => {
   });
 
   it("reopens committed batches, requests a full rescan, and resumes without duplicates", async () => {
-    const folder = mkdtempSync(path.join(tmpdir(), "usageatlas-import-"));
+    const folder = mkdtempSync(path.join(tmpdir(), "activityusage-import-"));
     resources.push(() => rmSync(folder, { recursive: true, force: true }));
     const file = path.join(folder, "history.sqlite");
     const first = SqliteHistoryStore.open(file);

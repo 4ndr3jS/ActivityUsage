@@ -1,5 +1,5 @@
-import cursorFixture from "@usageatlas/contracts/fixtures/providers/cursor-usage-summary.json";
-import type { DashboardSnapshot, JsonValue } from "@usageatlas/contracts";
+import cursorFixture from "@activityusage/contracts/fixtures/providers/cursor-usage-summary.json";
+import type { DashboardSnapshot, JsonValue } from "@activityusage/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { validateDashboard } from "../main/dashboard-validation";
 import { buildAnalytics, unavailableAnalytics } from "./analytics/local-usage";
@@ -36,7 +36,7 @@ function setup() {
   let id = 0;
   const configure = async (accountId: string) => {
     const response = await engine.handle({ id: String(++id), method: "cloud", params: {
-      operation: "configure", accountId, token: "", baseURL: "https://usageatlas.example"
+      operation: "configure", accountId, token: "", baseURL: "https://activityusage.example"
     } });
     expect(response.ok).toBe(true);
   };
@@ -130,7 +130,7 @@ describe("account transitions with SQLite history", () => {
     expect(store.get("cursor", "cursor-user", "2026-09-08")).toBeNull();
     expect(current.providers[0]?.analytics).toMatchObject({ status: "partial", error: { code: "timeout" } });
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ records: [], next: null })));
-    await engine.handle({ id: "connect", method: "cloud", params: { operation: "configure", accountId: "old-account", token: "fixture", baseURL: "https://usageatlas.example" } });
+    await engine.handle({ id: "connect", method: "cloud", params: { operation: "configure", accountId: "old-account", token: "fixture", baseURL: "https://activityusage.example" } });
     await engine.handle({ id: "restore", method: "cloud", params: { operation: "restore" } });
     await vi.waitFor(() => expect(changed).toHaveBeenCalledOnce());
     expect((await read({ hydrateOnly: true })).providers[0]?.analytics).toMatchObject({ status: "partial", error: { code: "timeout" } });

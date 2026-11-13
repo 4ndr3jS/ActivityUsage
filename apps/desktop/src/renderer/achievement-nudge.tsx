@@ -1,4 +1,4 @@
-import type { DashboardSnapshot } from "@usageatlas/contracts";
+import type { DashboardSnapshot } from "@activityusage/contracts";
 import { toast } from "@heroui/react";
 import { useEffect, useMemo } from "react";
 import type { CloudProfileStatus } from "../shared/desktop-api";

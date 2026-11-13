@@ -1,12 +1,12 @@
 import { createHash } from "node:crypto";
-import type { DashboardWindow, HistoryDayPayload, HistoryDayRecord, UsageTotals } from "@usageatlas/contracts";
+import type { DashboardWindow, HistoryDayPayload, HistoryDayRecord, UsageTotals } from "@activityusage/contracts";
 import {
   validateUsageRecord,
   type UsageDay,
   type UsageProvider,
   type StoredTotals,
   type CapacitySnapshot
-} from "@usageatlas/contracts/usage";
+} from "@activityusage/contracts/usage";
 import { emptyUsageTotals, sumUsageTotals } from "./payload";
 
 export function stableId(...parts: string[]): string {
@@ -14,7 +14,7 @@ export function stableId(...parts: string[]): string {
   return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
 }
 export function usageSource(replica: string, provider: string, account: string): string {
-  return stableId("usageatlas", provider, account === "local" ? replica : account);
+  return stableId("activityusage", provider, account === "local" ? replica : account);
 }
 export function toUsageDay(row: HistoryDayRecord, replica: string, timeZone: string | null): UsageDay {
   const sourceId = usageSource(replica, row.providerId, row.accountKey);

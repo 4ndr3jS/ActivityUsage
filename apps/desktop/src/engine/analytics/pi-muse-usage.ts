@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
-import type { LocalUsageAnalytics } from "@usageatlas/contracts";
+import type { LocalUsageAnalytics } from "@activityusage/contracts";
 import type { AnalyticsScanContext, UsageRecord } from "./local-usage";
 import { emptyPricingCatalog, type PricingCatalog } from "./models-dev";
 import { normalizeClaudeModel, normalizeCodexModel } from "./pricing";

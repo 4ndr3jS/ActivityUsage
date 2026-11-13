@@ -1,4 +1,4 @@
-import { USAGE_PARSER_VERSION, type CollectedUsageEvent } from "@usageatlas/contracts/statistics";
+import { USAGE_PARSER_VERSION, type CollectedUsageEvent } from "@activityusage/contracts/statistics";
 import { localCalendarDay } from "../history/days";
 import type {
   LocalUsageAnalytics,
@@ -10,7 +10,7 @@ import type {
   UsageProjectBreakdown,
   UsageSessionBreakdown,
   UsageTotals
-} from "@usageatlas/contracts";
+} from "@activityusage/contracts";
 import { createReadStream } from "node:fs";
 import { opendir, stat } from "node:fs/promises";
 import { homedir } from "node:os";

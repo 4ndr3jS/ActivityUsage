@@ -7,8 +7,8 @@ import {
   type UsageProjectBreakdown,
   type UsageSessionBreakdown,
   type UsageTotals
-} from "@usageatlas/contracts";
-import type { LocalUsageAnalytics } from "@usageatlas/contracts";
+} from "@activityusage/contracts";
+import type { LocalUsageAnalytics } from "@activityusage/contracts";
 
 export function emptyUsageTotals(): UsageTotals {
   return {

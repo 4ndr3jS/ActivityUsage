@@ -1,4 +1,4 @@
-import type { DashboardSnapshot } from "@usageatlas/contracts";
+import type { DashboardSnapshot } from "@activityusage/contracts";
 import type { CloudProfileStatus, LeaderboardGlance } from "../shared/desktop-api";
 import type { PromptTriggerKind } from "../shared/growth-events";
 import { fromApp } from "../shared/website-links";
@@ -12,7 +12,7 @@ export const LEADERBOARD_URL = fromApp(`${PROFILE_SITE}/leaderboard`, "profile")
 const LEADERBOARD_DAYS = 30;
 /** The website's handle rules (`cloud/apps/web/lib/public-profile.ts`). */
 const HANDLE_PATTERN = /^[a-z0-9][a-z0-9_]{2,29}$/u;
-const RESERVED_HANDLES = new Set(["admin", "support", "usageatlas", "account", "api", "www"]);
+const RESERVED_HANDLES = new Set(["admin", "support", "activityusage", "account", "api", "www"]);
 const PREVIEW_WEEKS = 20;
 const TOKEN_MILESTONES = [10e6, 100e6, 1e9, 10e9, 100e9, 1e12];
 const STREAK_MILESTONES = [7, 30, 100, 365];
@@ -250,7 +250,7 @@ export interface ProfilePromptState {
   celebrated: string[];
 }
 
-export const PROMPT_STATE_KEY = "usageatlas.profilePrompt.v1";
+export const PROMPT_STATE_KEY = "activityusage.profilePrompt.v1";
 
 export function parsePromptState(raw: string | null, now: Date): ProfilePromptState {
   const fresh: ProfilePromptState = { firstSeenAt: now.toISOString(), lastShownAt: null, dismissals: 0, optedOut: false, celebrated: [] };

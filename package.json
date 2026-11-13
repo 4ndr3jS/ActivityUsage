@@ -1,5 +1,5 @@
 {
-  "name": "usageatlas-workspace",
+  "name": "activityusage-workspace",
   "private": true,
   "version": "0.0.0",
   "packageManager": "bun@1.3.14",
@@ -15,13 +15,13 @@
     "test": "node --test tooling/*.test.mjs && turbo run test",
     "typecheck": "turbo run typecheck",
     "generate:desktop-icons": "bun tooling/generate-desktop-icons.mjs",
-    "desktop:start": "turbo run dev --filter=@usageatlas/desktop --env-mode=loose",
-    "desktop:lint": "turbo run lint --filter=@usageatlas/desktop",
-    "desktop:typecheck": "turbo run typecheck --filter=@usageatlas/desktop",
-    "desktop:build": "turbo run build --filter=@usageatlas/desktop",
-    "desktop:test": "turbo run test --filter=@usageatlas/desktop",
-    "desktop:package": "turbo run package --filter=@usageatlas/desktop --env-mode=loose --",
-    "desktop:make": "turbo run make --filter=@usageatlas/desktop --env-mode=loose --"
+    "desktop:start": "turbo run dev --filter=@activityusage/desktop --env-mode=loose",
+    "desktop:lint": "turbo run lint --filter=@activityusage/desktop",
+    "desktop:typecheck": "turbo run typecheck --filter=@activityusage/desktop",
+    "desktop:build": "turbo run build --filter=@activityusage/desktop",
+    "desktop:test": "turbo run test --filter=@activityusage/desktop",
+    "desktop:package": "turbo run package --filter=@activityusage/desktop --env-mode=loose --",
+    "desktop:make": "turbo run make --filter=@activityusage/desktop --env-mode=loose --"
   },
   "engines": {
     "bun": ">=1.3.14",

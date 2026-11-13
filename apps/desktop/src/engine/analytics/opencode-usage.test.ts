@@ -410,7 +410,7 @@ describe("OpenCode local usage", () => {
 });
 
 async function createHome(): Promise<string> {
-  const directory = await mkdtemp(path.join(tmpdir(), "usageatlas-opencode-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "activityusage-opencode-"));
   directories.push(directory);
   return directory;
 }

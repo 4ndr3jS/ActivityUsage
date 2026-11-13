@@ -1,4 +1,4 @@
-import type { DashboardProvider, DashboardSnapshot, UsageBreakdown, UsageTotals } from "@usageatlas/contracts";
+import type { DashboardProvider, DashboardSnapshot, UsageBreakdown, UsageTotals } from "@activityusage/contracts";
 import { sumUsageTotals } from "./dashboard-model";
 import { inclusiveDayCount, type ProviderScope, providersForScope } from "./personal-analytics";
 import { formatHourOfDay } from "./time-format";

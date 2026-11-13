@@ -10,7 +10,7 @@ vi.mock("electron", () => ({
 import { PreferenceStore } from "./preferences";
 
 beforeEach(() => {
-  electron.directory = mkdtempSync(path.join(tmpdir(), "usageatlas-preferences-test-"));
+  electron.directory = mkdtempSync(path.join(tmpdir(), "activityusage-preferences-test-"));
 });
 afterEach(() => rmSync(electron.directory, { recursive: true, force: true }));
 

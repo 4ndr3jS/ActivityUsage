@@ -1,4 +1,4 @@
-import type { DashboardProvider } from "@usageatlas/contracts";
+import type { DashboardProvider } from "@activityusage/contracts";
 import { spawn } from "node:child_process";
 import type { ProviderAdapter, ProviderContext } from "../provider";
 import { ProviderError } from "../provider";
@@ -164,7 +164,7 @@ export async function readCodexRateLimits(signal: AbortSignal): Promise<unknown>
     child.stdin.write(JSON.stringify({
       method: "initialize",
       id: 0,
-      params: { clientInfo: { name: "usageatlas", title: "UsageAtlas", version: DESKTOP_VERSION } }
+      params: { clientInfo: { name: "activityusage", title: "Activity Usage", version: DESKTOP_VERSION } }
     }) + "\n");
   });
 }

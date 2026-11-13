@@ -1,4 +1,4 @@
-import type { DashboardSnapshot } from "@usageatlas/contracts";
+import type { DashboardSnapshot } from "@activityusage/contracts";
 import { Button, Card, Spinner } from "@heroui/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CloudProfileStatus, CloudStatus, LeaderboardGlance } from "../../shared/desktop-api";
@@ -130,7 +130,7 @@ export function ProfilePage({ cloud, leaderboard, onOpenExternal, onOpenSettings
             <>
               <h1 className="atlas-page-title">Your profile is live</h1>
               <p className="atlas-hero-description">
-                Anyone with the link can see usageatlas.com/@{profile.handle}. It updates each time UsageAtlas saves your usage.
+                Anyone with the link can see usageatlas.com/@{profile.handle}. It updates each time Activity Usage saves your usage.
               </p>
               {standing}
               <div className="atlas-profile-page__actions">
@@ -154,7 +154,7 @@ export function ProfilePage({ cloud, leaderboard, onOpenExternal, onOpenSettings
           ) : (
             <>
               <h1 className="atlas-page-title">We couldn't check your profile</h1>
-              <p className="atlas-hero-description">UsageAtlas couldn't reach usageatlas.com. Your usage on this computer is safe.</p>
+              <p className="atlas-hero-description">Activity Usage couldn't reach usageatlas.com. Your usage on this computer is safe.</p>
               <div className="atlas-profile-page__actions">
                 <Button isPending={cloud.pending === "refresh-profile"} onPress={() => void cloud.act("refresh-profile")}>Try again</Button>
                 <Button onPress={() => void onOpenExternal(`${PROFILE_SITE}/account/profile`)} variant="outline">Open profile settings</Button>
@@ -166,7 +166,7 @@ export function ProfilePage({ cloud, leaderboard, onOpenExternal, onOpenSettings
           {preview ? (
             <ProfilePreview handle={shownHandle} preview={preview} />
           ) : (
-            <p className="text-sm text-muted">Your preview appears once UsageAtlas has read your usage.</p>
+            <p className="text-sm text-muted">Your preview appears once Activity Usage has read your usage.</p>
           )}
         </div>
       </div>

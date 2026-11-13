@@ -1,8 +1,8 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { UsageAtlasDesktopAPI } from "../shared/desktop-api";
+import type { ActivityUsageDesktopAPI } from "../shared/desktop-api";
 import { IPC } from "../shared/desktop-api";
 
-type ActivityOnlyDesktopAPI = Pick<UsageAtlasDesktopAPI,
+type ActivityOnlyDesktopAPI = Pick<ActivityUsageDesktopAPI,
   "platform" | "getActivityWatchData" | "saveActivityWatchExport" |
   "getUpdateState" | "checkForUpdates" | "installUpdate" | "onUpdateState"
 >;

@@ -1,7 +1,7 @@
 import { createReadStream } from "node:fs";
 import { opendir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
-import type { LocalUsageAnalytics } from "@usageatlas/contracts";
+import type { LocalUsageAnalytics } from "@activityusage/contracts";
 import { buildAnalytics, unavailableAnalytics, type AnalyticsScanContext, type UsageRecord } from "./local-usage";
 import { emptyPricingCatalog, type PricingCatalog } from "./models-dev";
 import { estimateClaudeCost, estimateCodexCost } from "./pricing";

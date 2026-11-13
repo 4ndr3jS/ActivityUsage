@@ -16,12 +16,12 @@ export class UtilityEngineTransport implements EngineTransport {
   async start(handlers: EngineTransportHandlers): Promise<void> {
     if (this.child) return;
     const child = utilityProcess.fork(this.entryPath, [], {
-      serviceName: "UsageAtlas Engine",
+      serviceName: "Activity Usage Engine",
       stdio: "pipe",
       env: {
         ...process.env,
         ...(this.historyDatabasePath
-          ? { USAGEATLAS_HISTORY_DB: this.historyDatabasePath }
+          ? { ACTIVITY_USAGE_HISTORY_DB: this.historyDatabasePath }
           : {})
       }
     });

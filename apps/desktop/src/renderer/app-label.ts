@@ -3,7 +3,7 @@ const APP_NAMES: Record<string, string> = {
   brave: "Brave", chrome: "Google Chrome", msedge: "Microsoft Edge", firefox: "Firefox",
   explorer: "File Explorer", windowsterminal: "Windows Terminal", powershell: "PowerShell",
   pwsh: "PowerShell", cmd: "Command Prompt", code: "Visual Studio Code",
-  chatgpt: "ChatGPT", usageatlas: "UsageAtlas", rocketleague: "Rocket League", rocketleagueeac: "Rocket League",
+  chatgpt: "ChatGPT", activityusage: "Activity Usage", rocketleague: "Rocket League", rocketleagueeac: "Rocket League",
   fortnite: "Fortnite", fortniteclient: "Fortnite", spotify: "Spotify",
   syncthingfork: "Syncthing Fork", onedrive: "OneDrive", onenote: "OneNote",
   steamwebhelper: "Steam", discord: "Discord", obs64: "OBS Studio", obs: "OBS Studio",

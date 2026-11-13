@@ -1,4 +1,4 @@
-import type { DashboardSnapshot, UsageTotals } from "@usageatlas/contracts";
+import type { DashboardSnapshot, UsageTotals } from "@activityusage/contracts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { AppShell } from "./AppShell";

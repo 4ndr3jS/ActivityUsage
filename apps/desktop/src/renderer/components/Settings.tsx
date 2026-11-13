@@ -1,6 +1,6 @@
 import { UpdateSettings } from "./UpdateControls";
 import { CloudSettings } from "./CloudSettings";
-import type { DashboardProvider } from "@usageatlas/contracts";
+import type { DashboardProvider } from "@activityusage/contracts";
 import { Button, Card, Label, Radio, RadioGroup, Skeleton, Spinner, Switch } from "@heroui/react";
 import type { BackgroundImagePreference, BuiltInBackgroundId, DesktopPreferences, DesktopUpdateState } from "../../shared/desktop-api";
 import { DEFAULT_BACKGROUND_IMAGE, isBackgroundImagePreference } from "../../shared/desktop-api";
@@ -155,7 +155,7 @@ export function Settings({
             <Card.Header>
               <Card.Title>General</Card.Title>
               <Card.Description>
-                How UsageAtlas behaves on this computer.
+                How Activity Usage behaves on this computer.
               </Card.Description>
             </Card.Header>
             <Card.Content className="atlas-settings-list mt-2">
@@ -242,7 +242,7 @@ export function Settings({
             <Card.Header>
               <Card.Title>Usage count</Card.Title>
               <Card.Description>
-                A general headcount of how many people use UsageAtlas.
+                A general headcount of how many people use Activity Usage.
               </Card.Description>
             </Card.Header>
             <Card.Content className="atlas-settings-list mt-2">
@@ -261,7 +261,7 @@ export function Settings({
 
           <footer className="flex flex-col items-start gap-4 px-1 py-3 sm:flex-row sm:items-center">
             <div>
-              <strong className="text-sm font-medium">UsageAtlas</strong>
+              <strong className="text-sm font-medium">Activity Usage</strong>
               <p className="mt-1 text-xs text-muted">
                 Version {DESKTOP_VERSION} · Local-first desktop app
               </p>

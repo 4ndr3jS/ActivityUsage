@@ -31,9 +31,9 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 app.enableSandbox();
-app.setName("UsageAtlas");
+app.setName("Activity Usage");
 if (process.platform === "win32") {
-  app.setAppUserModelId(app.isPackaged ? "com.squirrel.UsageAtlas.UsageAtlas" : "com.usageatlas.desktop.dev");
+  app.setAppUserModelId(app.isPackaged ? "com.squirrel.ActivityUsage.ActivityUsage" : "com.activityusage.desktop.dev");
 }
 
 let mainWindow: BrowserWindow | null = null;
@@ -46,14 +46,14 @@ const windowChrome = {
   dark: { backgroundColor: "#1c1c1e", symbolColor: "#f5f5f7" }
 } as const;
 
-function runtimeIconPath(filename: "usageatlas.ico" | "usageatlas.png"): string {
+function runtimeIconPath(filename: "activityusage.ico" | "activityusage.png"): string {
   const directory = app.isPackaged ? path.join(process.resourcesPath, "icons") : path.join(app.getAppPath(), "resources", "icons");
   return path.join(directory, filename);
 }
 
 function runtimeLogo(): Electron.NativeImage {
-  const image = nativeImage.createFromPath(runtimeIconPath("usageatlas.png"));
-  if (image.isEmpty()) throw new Error("UsageAtlas application icon could not be loaded.");
+  const image = nativeImage.createFromPath(runtimeIconPath("activityusage.png"));
+  if (image.isEmpty()) throw new Error("Activity Usage application icon could not be loaded.");
   return image;
 }
 
@@ -61,7 +61,7 @@ function trustedRendererUrl(value: string): boolean {
   try {
     const candidate = new URL(value);
     if (MAIN_WINDOW_VITE_DEV_SERVER_URL) return candidate.origin === new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL).origin;
-    return candidate.protocol === "app:" && candidate.hostname === "usageatlas";
+    return candidate.protocol === "app:" && candidate.hostname === "activityusage";
   } catch {
     return false;
   }
@@ -90,12 +90,12 @@ function createWindow(route: AppRoute = "day"): BrowserWindow {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: chrome.backgroundColor,
-    icon: process.platform === "win32" ? nativeImage.createFromPath(runtimeIconPath("usageatlas.ico")) : runtimeLogo(),
+    icon: process.platform === "win32" ? nativeImage.createFromPath(runtimeIconPath("activityusage.ico")) : runtimeLogo(),
     roundedCorners: true,
     ...(process.platform === "darwin"
       ? { titleBarStyle: "hiddenInset" as const }
       : { titleBarStyle: "hidden" as const, titleBarOverlay: { color: chrome.backgroundColor, symbolColor: chrome.symbolColor, height: 40 } }),
-    title: "UsageAtlas",
+    title: "Activity Usage",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -129,7 +129,7 @@ function createWindow(route: AppRoute = "day"): BrowserWindow {
     url.hash = route;
     void window.loadURL(url.toString());
   } else {
-    void window.loadURL(`app://usageatlas/index.html#${route}`);
+    void window.loadURL(`app://activityusage/index.html#${route}`);
   }
   return window;
 }
@@ -156,7 +156,7 @@ function registerIPC(): void {
     const owner = BrowserWindow.fromWebContents(event.sender);
     const options: Electron.SaveDialogOptions = {
       title: "Export device activity summary",
-      defaultPath: path.join(app.getPath("downloads"), "usageatlas-device-activity.json"),
+      defaultPath: path.join(app.getPath("downloads"), "activityusage-device-activity.json"),
       filters: [{ name: "JSON summary", extensions: ["json"] }]
     };
     const result = owner ? await dialog.showSaveDialog(owner, options) : await dialog.showSaveDialog(options);
@@ -184,7 +184,7 @@ async function registerApplicationProtocol(): Promise<void> {
   const rendererRoot = path.resolve(__dirname, "../renderer", MAIN_WINDOW_VITE_NAME);
   protocol.handle("app", request => {
     const parsed = new URL(request.url);
-    if (parsed.hostname !== "usageatlas") return new Response("Not found", { status: 404 });
+    if (parsed.hostname !== "activityusage") return new Response("Not found", { status: 404 });
     if (MAIN_WINDOW_VITE_DEV_SERVER_URL) return new Response("Not found", { status: 404 });
     const relativePath = decodeURIComponent(parsed.pathname).replace(/^\/+/, "") || "index.html";
     const requestedPath = path.resolve(rendererRoot, relativePath);
@@ -217,7 +217,7 @@ if (squirrelStartup || !app.requestSingleInstanceLock()) {
       else { mainWindow.show(); mainWindow.focus(); }
     });
   }).catch(error => {
-    console.error("UsageAtlas could not start.", error);
+    console.error("Activity Usage could not start.", error);
     app.quit();
   });
 }

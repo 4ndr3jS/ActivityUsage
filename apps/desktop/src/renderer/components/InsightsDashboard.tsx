@@ -1,4 +1,4 @@
-import type { DashboardSnapshot } from "@usageatlas/contracts";
+import type { DashboardSnapshot } from "@activityusage/contracts";
 import { Button, Card, Tooltip } from "@heroui/react";
 import { useMemo, useState } from "react";
 import { DayIcon, HistoryIcon, MoonIcon, ProvidersIcon, RefreshIcon, SunIcon } from "../icons";
@@ -136,7 +136,7 @@ function RhythmCard({ insights }: { insights: UsageInsights }): React.JSX.Elemen
             <h2>{persona?.label ?? "Your rhythm is still forming"}</h2>
             <p>
               {persona?.description
-                ?? "Hourly history is needed before UsageAtlas can identify your strongest work window."}
+                ?? "Hourly history is needed before Activity Usage can identify your strongest work window."}
             </p>
           </div>
         </div>

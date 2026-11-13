@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { DashboardSnapshot } from "@usageatlas/contracts";
-import { validateUsageFact } from "@usageatlas/contracts/statistics";
-import { validateUsageRecord } from "@usageatlas/contracts/usage";
+import type { DashboardSnapshot } from "@activityusage/contracts";
+import { validateUsageFact } from "@activityusage/contracts/statistics";
+import { validateUsageRecord } from "@activityusage/contracts/usage";
 import { validateDashboard } from "../../main/dashboard-validation";
 import { EngineService } from "../engine-service";
 import { ProviderError } from "../provider";

@@ -140,7 +140,7 @@ export class CloudAccount {
     this.loginAttempt = attempt;
     try {
       const response = await this.request("/api/auth/device/code", {
-        client_id: "usageatlas-desktop",
+        client_id: "activityusage-desktop",
       });
       if (this.loginAttempt !== attempt) return;
       if (
@@ -189,13 +189,13 @@ export class CloudAccount {
     try {
       if (existsSync(this.filename)) unlinkSync(this.filename);
     } catch {
-      removalError = new Error("The saved sign-in could not be removed. Close other UsageAtlas windows and try signing out again.");
+      removalError = new Error("The saved sign-in could not be removed. Close other Activity Usage windows and try signing out again.");
     }
     // A locked session file must not leave automatic cloud saves connected.
     try {
       await this.configure();
     } catch (error) {
-      this.error = error instanceof Error ? error.message : "Could not disconnect cloud sync. Close UsageAtlas and try again.";
+      this.error = error instanceof Error ? error.message : "Could not disconnect cloud sync. Close Activity Usage and try again.";
       throw error;
     } finally {
       if (session)
@@ -247,7 +247,7 @@ export class CloudAccount {
       const response = await this.request("/api/auth/device/token", {
         grant_type: "urn:ietf:params:oauth:grant-type:device_code",
         device_code: login.deviceCode,
-        client_id: "usageatlas-desktop",
+        client_id: "activityusage-desktop",
       });
       if (this.login !== login) return;
       if (
@@ -318,7 +318,7 @@ export class CloudAccount {
       });
     } catch {
       throw new Error(
-        "Could not reach UsageAtlas. Check your connection and try again.",
+        "Could not reach Activity Usage. Check your connection and try again.",
       );
     }
     const reader = response.body?.getReader();

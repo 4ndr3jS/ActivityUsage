@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PublicLeaderboard } from "./public-leaderboard";
 
-const BASE = "https://usageatlas.test";
+const BASE = "https://activityusage.test";
 const uploaded = `/api/avatars/${"a".repeat(64)}/${"b".repeat(64)}.png`;
 const png = new Uint8Array([137, 80, 78, 71]);
 
@@ -118,7 +118,7 @@ describe("public leaderboard", () => {
 
     clock = 10 * 60_000;
     fetchMock.mockRejectedValueOnce(new TypeError("offline"));
-    await expect(cache.glance()).rejects.toThrow("Could not reach UsageAtlas.");
+    await expect(cache.glance()).rejects.toThrow("Could not reach Activity Usage.");
     expect((await cache.glance()).entries).toHaveLength(1);
     expect(requested()).toHaveLength(3);
   });

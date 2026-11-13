@@ -1,4 +1,4 @@
-import type { DashboardProvider, QuotaMetric } from "@usageatlas/contracts";
+import type { DashboardProvider, QuotaMetric } from "@activityusage/contracts";
 import { ProviderLogo } from "./ProviderLogo";
 
 export function QuotaDetails({ providers }: { providers: DashboardProvider[] }): React.JSX.Element | null {

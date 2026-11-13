@@ -4,7 +4,7 @@ import {
   type LocalUsageAnalytics,
   type UsageDailyMetric,
   type UsageDailyModelMetric
-} from "@usageatlas/contracts";
+} from "@activityusage/contracts";
 import { dayRange, localCalendarDay, shiftLocalDay } from "./days";
 import {
   emptyUsageTotals,

@@ -1,4 +1,4 @@
-import type { DashboardProvider } from "@usageatlas/contracts";
+import type { DashboardProvider } from "@activityusage/contracts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { HealthNotice } from "./Diagnostics";

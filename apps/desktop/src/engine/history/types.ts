@@ -1,8 +1,8 @@
-import type { DashboardProvider, HistoryDayPayload, HistoryDayRecord } from "@usageatlas/contracts";
+import type { DashboardProvider, HistoryDayPayload, HistoryDayRecord } from "@activityusage/contracts";
 
 export interface HistoryStore {
   replicaId(): string;
-  saveCollection?(providerId: string, accountKey: string, analytics: import("@usageatlas/contracts").LocalUsageAnalytics): void;
+  saveCollection?(providerId: string, accountKey: string, analytics: import("@activityusage/contracts").LocalUsageAnalytics): void;
   reportingTimeZone?(providerId: string, accountKey: string): string;
   needsCollectionRefresh?(providerId: string, accountKey: string): boolean;
   needsTimezoneRefresh?(providerId: string, accountKey: string): boolean;

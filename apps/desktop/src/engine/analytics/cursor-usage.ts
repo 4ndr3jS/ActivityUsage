@@ -1,5 +1,5 @@
 import { localCalendarDay, shiftLocalDay } from "../history/days";
-import type { LocalUsageAnalytics, ProviderFailure } from "@usageatlas/contracts";
+import type { LocalUsageAnalytics, ProviderFailure } from "@activityusage/contracts";
 import { ProviderError } from "../provider";
 import { fetchProviderJson, type FetchImplementation } from "../platform/http";
 import { buildAnalytics, unavailableAnalytics, type UsageRecord } from "./local-usage";

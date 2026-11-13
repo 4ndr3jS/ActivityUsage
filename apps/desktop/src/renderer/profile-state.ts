@@ -1,4 +1,4 @@
-import type { DashboardSnapshot } from "@usageatlas/contracts";
+import type { DashboardSnapshot } from "@activityusage/contracts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CloudProfileStatus, CloudStatus, LeaderboardGlance } from "../shared/desktop-api";
 import type { GrowthEvent, GrowthEventProperties } from "../shared/growth-events";
@@ -24,7 +24,7 @@ const WEBSITE_RECHECK_MS = 30_000;
 const PAGE_RECHECK_MS = 60_000;
 /** Let the usage page settle before anything covers it. */
 const PROMPT_DELAY_MS = 4_000;
-const PAGE_VISITED_KEY = "usageatlas.profilePageVisited";
+const PAGE_VISITED_KEY = "activityusage.profilePageVisited";
 
 export type ProfileCloudAction = "sign-in" | "sign-out" | "refresh-profile";
 

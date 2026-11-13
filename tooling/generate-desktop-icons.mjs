@@ -38,16 +38,16 @@ const icnsRepresentations = [
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const brandingRoot = path.join(repoRoot, "branding");
-const masterPath = path.join(brandingRoot, "usageatlas-primary.png");
-const brandingLogoPath = path.join(brandingRoot, "usageatlas-logo.png");
+const masterPath = path.join(brandingRoot, "activityusage-primary.png");
+const brandingLogoPath = path.join(brandingRoot, "activityusage-logo.png");
 const destinationRoot = path.join(repoRoot, "apps", "desktop", "resources", "icons");
-const pngPath = path.join(destinationRoot, "usageatlas.png");
-const icoPath = path.join(destinationRoot, "usageatlas.ico");
+const pngPath = path.join(destinationRoot, "activityusage.png");
+const icoPath = path.join(destinationRoot, "activityusage.ico");
 const installerRoot = path.join(repoRoot, "apps", "desktop", "resources", "installer");
 // The packaged app ships everything under resources/icons, so the icns, which
 // only the macOS build reads, sits with the other build-time artwork.
-const icnsPath = path.join(installerRoot, "usageatlas.icns");
-const supersededIcnsPath = path.join(destinationRoot, "usageatlas.icns");
+const icnsPath = path.join(installerRoot, "activityusage.icns");
+const supersededIcnsPath = path.join(destinationRoot, "activityusage.icns");
 const dmgBackgroundPath = path.join(installerRoot, "dmg-background.png");
 const webPublicRoot = path.join(repoRoot, "apps", "web", "public");
 const webLogoPath = path.join(webPublicRoot, "logo.png");
@@ -88,7 +88,7 @@ console.log(`Generated ${written.map((file) => path.relative(repoRoot, file)).jo
 // and bleeding it outwards stops the matte creeping back in when a smaller icon
 // averages across the edge.
 function readArtwork(master) {
-  if (master.width !== master.height) throw new Error("UsageAtlas application icon must be square");
+  if (master.width !== master.height) throw new Error("Activity Usage application icon must be square");
 
   const { width } = master;
   const coverage = roundedSquareCoverage(width);

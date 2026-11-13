@@ -10,7 +10,7 @@ import {
   type HistoryDayRecord,
   type JsonValue,
   type ProviderFailure
-} from "@usageatlas/contracts";
+} from "@activityusage/contracts";
 import {
   HISTORY_BACKFILL_DAYS,
   HISTORY_SNAPSHOT_DAYS,

@@ -149,7 +149,7 @@ export function CloudSettings(): React.JSX.Element {
             <div className="space-y-1 text-xs text-muted" role="status" aria-live="polite">
               <p>{message}</p>
               {(saving || restoring) && (
-                <p>This may take a minute or two. You can keep using UsageAtlas.</p>
+                <p>This may take a minute or two. You can keep using Activity Usage.</p>
               )}
             </div>
             {status.conflicts.map((conflict) => (

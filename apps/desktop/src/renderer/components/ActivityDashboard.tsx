@@ -53,9 +53,9 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   const [periodOffset, setPeriodOffset] = useState(0);
   const [device, setDevice] = useState<DeviceFilter>("all");
   const [compare, setCompare] = useState(false);
-  const [showTitles, setShowTitles] = useState(() => readPreference("usageatlas.activity.showTitles"));
-  const [includeLabels, setIncludeLabels] = useState(() => readPreference("usageatlas.activity.includeLabels"));
-  const [autoRefresh, setAutoRefresh] = useState(() => readPreference("usageatlas.activity.autoRefresh"));
+  const [showTitles, setShowTitles] = useState(() => readPreference("activityusage.activity.showTitles"));
+  const [includeLabels, setIncludeLabels] = useState(() => readPreference("activityusage.activity.includeLabels"));
+  const [autoRefresh, setAutoRefresh] = useState(() => readPreference("activityusage.activity.autoRefresh"));
   const [snapshot, setSnapshot] = useState<ActivityWatchSnapshot | null>(null);
   const [previousSnapshot, setPreviousSnapshot] = useState<ActivityWatchSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
@@ -238,9 +238,9 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
       )}
       {view === "sources" && <SourcesView snapshot={snapshot} device={device} />}
       {view === "settings" && <ActivitySettingsView showTitles={showTitles} includeLabels={includeLabels} autoRefresh={autoRefresh}
-        onShowTitles={value => updatePreference("usageatlas.activity.showTitles", value, setShowTitles)}
-        onIncludeLabels={value => updatePreference("usageatlas.activity.includeLabels", value, setIncludeLabels)}
-        onAutoRefresh={value => updatePreference("usageatlas.activity.autoRefresh", value, setAutoRefresh)} />}
+        onShowTitles={value => updatePreference("activityusage.activity.showTitles", value, setShowTitles)}
+        onIncludeLabels={value => updatePreference("activityusage.activity.includeLabels", value, setIncludeLabels)}
+        onAutoRefresh={value => updatePreference("activityusage.activity.autoRefresh", value, setAutoRefresh)} />}
     </section>
   );
 }
@@ -390,7 +390,7 @@ function ActivitySettingsView({ showTitles, includeLabels, autoRefresh, onShowTi
       <PreferenceToggle checked={showTitles} label="Show window titles" note="Window titles may reveal document or page names." onChange={onShowTitles} />
       <PreferenceToggle checked={includeLabels} label="Include app labels in exports" note="Off by default; exports contain totals and daily activity only." onChange={onIncludeLabels} />
       <PreferenceToggle checked={autoRefresh} label="Refresh every five minutes" note="Reads the local ActivityWatch API while this page is open." onChange={onAutoRefresh} />
-      <p className="activity-privacy-note">ActivityWatch data stays in its local database. UsageAtlas does not upload device activity.</p>
+      <p className="activity-privacy-note">ActivityWatch data stays in its local database. Activity Usage does not upload device activity.</p>
     </section>
     <section className="activity-glass-card activity-privacy-card"><p className="activity-eyebrow">DISPLAY</p><h2>Reporting time zone</h2>
       <div className="activity-timezone-row"><span>System time zone</span><strong>{timeZone}</strong></div>

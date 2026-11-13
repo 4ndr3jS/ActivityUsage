@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import type { DashboardProvider, LocalUsageAnalytics } from "@usageatlas/contracts";
-import { factContent, validateUsageFact, STATISTICS_BATCH_SIZE, STATISTICS_MAX_BYTES, type UsageFact, type UsageEventFact } from "@usageatlas/contracts/statistics";
-import type { UsageProvider } from "@usageatlas/contracts/usage";
+import type { DashboardProvider, LocalUsageAnalytics } from "@activityusage/contracts";
+import { factContent, validateUsageFact, STATISTICS_BATCH_SIZE, STATISTICS_MAX_BYTES, type UsageFact, type UsageEventFact } from "@activityusage/contracts/statistics";
+import type { UsageProvider } from "@activityusage/contracts/usage";
 import type { SqliteOperation, WritableSqliteDatabase } from "../platform/sqlite";
 import { stableId, usageSource } from "./usage-payload";
 

@@ -23,7 +23,7 @@ export interface DesktopUpdater {
 }
 
 export function configureAutoUpdates(hooks: AutoUpdateHooks = {}): DesktopUpdater {
-  const enabled = app.isPackaged && process.env.USAGEATLAS_SMOKE_TEST !== "1";
+  const enabled = app.isPackaged && process.env.ACTIVITY_USAGE_SMOKE_TEST !== "1";
   const currentVersion = app.getVersion();
   const feedURL = squirrelFeedURL(process.platform, process.arch, currentVersion);
   const firstRunUntil = process.argv.includes("--squirrel-firstrun") ? Date.now() + FIRST_CHECK_DELAY_MS : 0;

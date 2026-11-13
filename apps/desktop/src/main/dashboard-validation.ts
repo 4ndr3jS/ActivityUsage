@@ -1,5 +1,5 @@
-import type { DashboardSnapshot, JsonValue } from "@usageatlas/contracts";
-import dashboardSchema from "@usageatlas/contracts/dashboard-v2.schema.json";
+import type { DashboardSnapshot, JsonValue } from "@activityusage/contracts";
+import dashboardSchema from "@activityusage/contracts/dashboard-v2.schema.json";
 import type { ValidateFunction } from "ajv";
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";

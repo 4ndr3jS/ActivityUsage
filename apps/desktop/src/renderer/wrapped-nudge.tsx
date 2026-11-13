@@ -8,7 +8,7 @@ import { markGrowthToast, trackGrowth, whenInFront } from "./profile-state";
 /** The same moment as the achievement toast, which stands aside while this one is due. */
 const NUDGE_DELAY_MS = 6_000;
 const NUDGE_TIMEOUT_MS = 12_000;
-const WRAPPED_SEEN_KEY = "usageatlas.wrapped.v1";
+const WRAPPED_SEEN_KEY = "activityusage.wrapped.v1";
 
 /** The last year whose Wrapped was announced or opened here. */
 function readSeenWrapped(): number | null {

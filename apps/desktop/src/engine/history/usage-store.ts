@@ -11,7 +11,7 @@ import {
   type CloudRecord,
   type PendingRecord,
   type UsageRecord
-} from "@usageatlas/contracts/usage";
+} from "@activityusage/contracts/usage";
 import type { WritableSqliteDatabase } from "../platform/sqlite";
 
 export interface LocalRecord extends PendingRecord {

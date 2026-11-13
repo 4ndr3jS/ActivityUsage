@@ -1,6 +1,6 @@
 import { Card, Skeleton, Spinner, Switch } from "@heroui/react";
 import { useId, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
-import type { DashboardProvider, DashboardWindow } from "@usageatlas/contracts";
+import type { DashboardProvider, DashboardWindow } from "@activityusage/contracts";
 import type { DesktopPreferences, UsageAlertRule } from "../../shared/desktop-api";
 import { DEFAULT_USAGE_ALERT_THRESHOLD } from "../../shared/usage-alerts";
 import { formatReset } from "../dashboard-model";
@@ -77,7 +77,7 @@ export function UsageAlertsPage({
         <div>
           <p className="atlas-page__kicker">Notifications</p>
           <h1>Usage alerts</h1>
-          <p>Choose exactly when UsageAtlas should warn you before a usage window runs out.</p>
+          <p>Choose exactly when Activity Usage should warn you before a usage window runs out.</p>
         </div>
         <div className="atlas-alerts-page__save-status" role="status" aria-live="polite">
           {saving ? (
@@ -112,7 +112,7 @@ export function UsageAlertsPage({
                 <div>
                   <h2>Your usage safety net</h2>
                   <p>
-                    UsageAtlas sends one desktop notification per reset cycle when remaining usage
+                    Activity Usage sends one desktop notification per reset cycle when remaining usage
                     crosses your chosen threshold.
                   </p>
                 </div>

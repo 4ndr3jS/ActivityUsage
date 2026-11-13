@@ -17,7 +17,7 @@ afterEach(async () => {
 
 describe("engine platform services", () => {
   it("checkpoints on a separate connection and closes it before reopening the database", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "usageatlas-checkpoint-")); directories.push(directory);
+    const directory = await mkdtemp(path.join(tmpdir(), "activityusage-checkpoint-")); directories.push(directory);
     const file = path.join(directory, "history.sqlite");
     const db = openWritableSqlite(file);
     try {
@@ -47,7 +47,7 @@ describe("engine platform services", () => {
   });
 
   it("reads bounded credential JSON without exposing its path in errors", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "usageatlas-credentials-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "activityusage-credentials-"));
     directories.push(directory);
     const file = path.join(directory, "auth.json");
     await writeFile(file, JSON.stringify({ token: "fixture" }));

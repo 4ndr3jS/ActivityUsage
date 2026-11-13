@@ -1,4 +1,4 @@
-import type { DashboardWindow } from "@usageatlas/contracts";
+import type { DashboardWindow } from "@activityusage/contracts";
 import { ProviderError } from "../provider";
 
 export function object(value: unknown, providerName: string): Record<string, unknown> {

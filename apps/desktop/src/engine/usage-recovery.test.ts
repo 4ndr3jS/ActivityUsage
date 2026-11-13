@@ -1,5 +1,5 @@
-import cursorFixture from "@usageatlas/contracts/fixtures/providers/cursor-usage-summary.json";
-import type { JsonValue } from "@usageatlas/contracts";
+import cursorFixture from "@activityusage/contracts/fixtures/providers/cursor-usage-summary.json";
+import type { JsonValue } from "@activityusage/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DashboardSession } from "../main/dashboard-session";
 import { validateDashboard } from "../main/dashboard-validation";
@@ -38,7 +38,7 @@ describe("usage recovery", () => {
     }, () => {});
     try {
       await dashboard.configure(accountId, () => request(engine, "cloud", {
-        operation: "configure", accountId, token: accountId ? "fixture" : "", baseURL: "https://usageatlas.example"
+        operation: "configure", accountId, token: accountId ? "fixture" : "", baseURL: "https://activityusage.example"
       }));
       dashboard.activate();
       const current = await dashboard.refresh(true);

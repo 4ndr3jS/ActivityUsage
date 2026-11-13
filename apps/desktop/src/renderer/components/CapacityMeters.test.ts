@@ -1,4 +1,4 @@
-import type { DashboardProvider } from "@usageatlas/contracts";
+import type { DashboardProvider } from "@activityusage/contracts";
 import { describe, expect, it } from "vitest";
 import {
   limitEntries,

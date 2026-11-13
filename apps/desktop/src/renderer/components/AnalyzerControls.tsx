@@ -1,4 +1,4 @@
-import type { DashboardProvider } from "@usageatlas/contracts";
+import type { DashboardProvider } from "@activityusage/contracts";
 import { Button, Input, Label, ListBox, Popover, Select, Tooltip } from "@heroui/react";
 import { useState } from "react";
 import type { AnalyticsRange, ProviderScope } from "../personal-analytics";

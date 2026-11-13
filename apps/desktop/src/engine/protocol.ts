@@ -1,5 +1,5 @@
 import type { LocalImportProgress } from "../shared/desktop-api";
-import type { JsonValue } from "@usageatlas/contracts";
+import type { JsonValue } from "@activityusage/contracts";
 
 export const ENGINE_MESSAGE_LIMIT = 1_048_576;
 export const ENGINE_PROTOCOL_VERSION = 1 as const;

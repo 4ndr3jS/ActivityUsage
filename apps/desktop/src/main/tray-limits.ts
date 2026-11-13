@@ -1,4 +1,4 @@
-import type { DashboardSnapshot } from "@usageatlas/contracts";
+import type { DashboardSnapshot } from "@activityusage/contracts";
 import { trayLimitEntries, type TrayLimitPreferences } from "../shared/capacity-model";
 
 export function trayLimitLabels(

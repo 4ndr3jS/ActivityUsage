@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:usageatlas:usage-record:v1",
-  "title": "UsageAtlas shared usage record v1",
+  "$id": "urn:activityusage:usage-record:v1",
+  "title": "Activity Usage shared usage record v1",
   "description": "Shared usage records stored locally and saved to an account. Use validateUsageRecord from the contracts usage module for structural and semantic validation.",
   "oneOf": [
     {

@@ -52,7 +52,7 @@ export function ProviderCredentialForm({ provider }: { provider: QuotaProviderId
       {provider === "kilo" ? <label className="grid gap-1 text-xs">Organization ID, optional
         <Input aria-label="Kilo organization ID" disabled={busy} maxLength={128} onChange={event => setOrganization(event.target.value)} placeholder="Leave empty for personal usage" value={organization} />
       </label> : null}
-      <p className="text-xs text-muted">Credentials are encrypted on this device and excluded from cloud saves. You can also set {info.environment} before starting UsageAtlas.</p>
+      <p className="text-xs text-muted">Credentials are encrypted on this device and excluded from cloud saves. You can also set {info.environment} before starting Activity Usage.</p>
       <div className="flex flex-wrap gap-2">
         <Button isDisabled={!secret.trim() || busy || !loaded} type="submit" variant="secondary">Save and check</Button>
         {configured ? <Button isDisabled={busy} onPress={() => void save(true)} variant="ghost">Remove saved credential</Button> : null}

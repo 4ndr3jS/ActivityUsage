@@ -1,5 +1,5 @@
-import fixtureSnapshot from "@usageatlas/contracts/fixtures/dashboard-v2.json";
-import type { DashboardSnapshot } from "@usageatlas/contracts";
+import fixtureSnapshot from "@activityusage/contracts/fixtures/dashboard-v2.json";
+import type { DashboardSnapshot } from "@activityusage/contracts";
 import { describe, expect, it } from "vitest";
 import { buildModelMix, buildUsageInsights } from "./usage-insights";
 

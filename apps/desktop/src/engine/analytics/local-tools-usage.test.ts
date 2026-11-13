@@ -4,8 +4,8 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { buildAntigravityTestWorker } from "./antigravity-test-worker";
-import { validateUsageFact } from "@usageatlas/contracts/statistics";
-import { validateUsageRecord } from "@usageatlas/contracts/usage";
+import { validateUsageFact } from "@activityusage/contracts/statistics";
+import { validateUsageRecord } from "@activityusage/contracts/usage";
 import { AntigravityUsageScanner, antigravityRoots } from "./antigravity-usage";
 import { JsonSessionUsageScanner, sessionRoots } from "./pi-muse-usage";
 import { pricingCatalogFromRates } from "./models-dev";
@@ -21,7 +21,7 @@ beforeAll(async () => { workerPath = await buildAntigravityTestWorker(); });
 const now = new Date("2026-09-27T12:00:00Z");
 const context = () => ({ now, historyDays: 90, timeZone: "UTC", signal: new AbortController().signal });
 afterEach(async () => { for (const dir of directories.splice(0)) await rm(dir, { force: true, recursive: true }); });
-async function home() { const dir = await mkdtemp(path.join(tmpdir(), "usageatlas-local-tools-")); directories.push(dir); return dir; }
+async function home() { const dir = await mkdtemp(path.join(tmpdir(), "activityusage-local-tools-")); directories.push(dir); return dir; }
 async function jsonl(file: string, rows: unknown[], tail = "") {
   await mkdir(path.dirname(file), { recursive: true }); await writeFile(file, rows.map(row => JSON.stringify(row)).join("\n") + "\n" + tail);
 }

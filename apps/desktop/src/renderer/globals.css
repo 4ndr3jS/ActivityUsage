@@ -184,7 +184,7 @@
   }
 
   body[data-wallpaper="anime-calm"] {
-    --atlas-wallpaper-image: url("./assets/usageatlas-anime-calm-wallpaper-night.png");
+    --atlas-wallpaper-image: url("./assets/activityusage-anime-calm-wallpaper-night.png");
   }
 
   body[data-wallpaper="monterey"] {
@@ -2250,7 +2250,7 @@
 }
 
 .atlas-wallpaper-option__preview[data-wallpaper="anime-calm"] {
-  background-image: url("./assets/usageatlas-anime-calm-wallpaper-night.png");
+  background-image: url("./assets/activityusage-anime-calm-wallpaper-night.png");
 }
 
 .atlas-wallpaper-option__preview[data-wallpaper="monterey"] {

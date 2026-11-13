@@ -1,4 +1,4 @@
-import { validateUsageFact, STATISTICS_BATCH_SIZE, type UsageFact } from "@usageatlas/contracts/statistics";
+import { validateUsageFact, STATISTICS_BATCH_SIZE, type UsageFact } from "@activityusage/contracts/statistics";
 import {
   USAGE_BATCH_SIZE,
   USAGE_MAX_BYTES,
@@ -7,7 +7,7 @@ import {
   type CloudRecord,
   type PendingRecord,
   type SaveResult
-} from "@usageatlas/contracts/usage";
+} from "@activityusage/contracts/usage";
 import type { CloudProgress } from "../../shared/desktop-api";
 import { UsageStore } from "./usage-store";
 

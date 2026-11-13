@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import type { LocalUsageAnalytics } from "@usageatlas/contracts";
-import type { UsageFact } from "@usageatlas/contracts/statistics";
-import type { UsageProvider } from "@usageatlas/contracts/usage";
+import type { LocalUsageAnalytics } from "@activityusage/contracts";
+import type { UsageFact } from "@activityusage/contracts/statistics";
+import type { UsageProvider } from "@activityusage/contracts/usage";
 import type { LocalImportProgress } from "../../shared/desktop-api";
 import { stableId } from "./usage-payload";
 import type { UsageStore } from "./usage-store";

@@ -135,7 +135,7 @@ describe("models.dev catalog", () => {
 });
 
 async function createHome(): Promise<string> {
-  const directory = await mkdtemp(path.join(tmpdir(), "usageatlas-models-dev-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "activityusage-models-dev-"));
   directories.push(directory);
   return directory;
 }

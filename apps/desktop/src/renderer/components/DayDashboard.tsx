@@ -1,4 +1,4 @@
-import type { DashboardSnapshot } from "@usageatlas/contracts";
+import type { DashboardSnapshot } from "@activityusage/contracts";
 import { Button, Card, Tooltip } from "@heroui/react";
 import { buildActivitySeries } from "../activity-buckets";
 import type { AnalyticsRange, ProviderScope } from "../personal-analytics";

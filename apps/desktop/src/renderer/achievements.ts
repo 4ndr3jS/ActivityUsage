@@ -1,4 +1,4 @@
-import type { DashboardSnapshot } from "@usageatlas/contracts";
+import type { DashboardSnapshot } from "@activityusage/contracts";
 import type { CloudStatus } from "../shared/desktop-api";
 import { formatCompactNumber } from "./number-format";
 import { buildPeriodUsage, enabledProviders, periodBounds } from "./personal-analytics";
@@ -125,7 +125,7 @@ export function nextTierShare(progress: AchievementProgress): number {
 /** The highest tier already announced, per family. */
 export type SeenAchievements = Partial<Record<AchievementId, number>>;
 
-export const ACHIEVEMENTS_SEEN_KEY = "usageatlas.achievements.v1";
+export const ACHIEVEMENTS_SEEN_KEY = "activityusage.achievements.v1";
 
 /** Null before the first check, which then sums up instead of announcing each tier. */
 export function parseSeenAchievements(raw: string | null): SeenAchievements | null {

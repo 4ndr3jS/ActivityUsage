@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import path from "node:path";
 import { Worker } from "node:worker_threads";
-import type { LocalUsageAnalytics } from "@usageatlas/contracts";
+import type { LocalUsageAnalytics } from "@activityusage/contracts";
 import type { AnalyticsScanContext } from "./local-usage";
 import { emptyPricingCatalog } from "./models-dev";
 import type { AntigravityDatabaseResult } from "./antigravity-database";

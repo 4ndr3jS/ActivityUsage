@@ -48,7 +48,7 @@ beforeEach(() => {
   files.failRemove = false;
   electron.encryptString.mockClear();
   electron.directory = mkdtempSync(
-    path.join(tmpdir(), "usageatlas-auth-test-"),
+    path.join(tmpdir(), "activityusage-auth-test-"),
   );
   electron.openExternal.mockReset().mockResolvedValue(undefined);
   engineAccountId = null;

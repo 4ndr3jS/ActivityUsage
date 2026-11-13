@@ -1,5 +1,5 @@
-import fixtureSnapshot from "@usageatlas/contracts/fixtures/dashboard-v2.json";
-import type { DashboardSnapshot } from "@usageatlas/contracts";
+import fixtureSnapshot from "@activityusage/contracts/fixtures/dashboard-v2.json";
+import type { DashboardSnapshot } from "@activityusage/contracts";
 import { describe, expect, it } from "vitest";
 import { shiftDay } from "./personal-analytics";
 import {
@@ -84,7 +84,7 @@ describe("recap", () => {
     expect(recapBusiestDay(recap)).toBe("Tue, Jul 14");
     expect(recapPostText(recap)).toBe("My week in AI coding: 2.1K tokens across Codex. 5 days in a row and counting.");
     expect(recapPostText({ ...recap, streak: 2, tools: [] })).toBe("My week in AI coding: 2.1K tokens.");
-    expect(recapFileName(recap)).toBe("usageatlas-week-2026-07-17.png");
+    expect(recapFileName(recap)).toBe("activityusage-week-2026-07-17.png");
   });
 
   it("links to the public profile, or to the website without one", () => {

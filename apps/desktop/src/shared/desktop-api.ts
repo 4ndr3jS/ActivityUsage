@@ -1,4 +1,4 @@
-import type { DashboardSnapshot } from "@usageatlas/contracts";
+import type { DashboardSnapshot } from "@activityusage/contracts";
 import type { GrowthEvent, GrowthEventProperties } from "./growth-events";
 import type { ProviderCredential, ProviderCredentialStatus, QuotaProviderId } from "./quota-providers";
 
@@ -131,7 +131,7 @@ export interface DashboardState {
   error: string | null;
 }
 
-export interface UsageAtlasDesktopAPI {
+export interface ActivityUsageDesktopAPI {
   /** Lets the renderer leave room for the native window controls. */
   platform: NodeJS.Platform;
   getProviderCredentials(): Promise<Record<string, ProviderCredentialStatus>>;

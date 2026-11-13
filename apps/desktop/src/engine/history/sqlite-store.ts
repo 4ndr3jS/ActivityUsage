@@ -1,8 +1,8 @@
 import { CollectionImporter } from "./collection-importer";
-import { USAGE_PARSER_VERSION } from "@usageatlas/contracts/statistics";
-import type { UsageProvider } from "@usageatlas/contracts/usage";
+import { USAGE_PARSER_VERSION } from "@activityusage/contracts/statistics";
+import type { UsageProvider } from "@activityusage/contracts/usage";
 import { randomUUID } from "node:crypto";
-import type { DashboardProvider, HistoryDayPayload, HistoryDayRecord } from "@usageatlas/contracts";
+import type { DashboardProvider, HistoryDayPayload, HistoryDayRecord } from "@activityusage/contracts";
 import { openWritableSqlite, type WritableSqliteDatabase } from "../platform/sqlite";
 import { dayRange } from "./days";
 import { canReplaceSealed, emptyUsageTotals, isEmptyHistoryPayload, readHistoryDayPayload } from "./payload";
@@ -146,7 +146,7 @@ export class SqliteHistoryStore implements HistoryStore {
       return [this.historyRow(updated, row.accountKey)!];
     });
   }
-  saveCollection(providerId: string, accountKey: string, analytics: import("@usageatlas/contracts").LocalUsageAnalytics): void {
+  saveCollection(providerId: string, accountKey: string, analytics: import("@activityusage/contracts").LocalUsageAnalytics): void {
     const collection = analytics.collection ?? {
       events: [], parserVersion: USAGE_PARSER_VERSION, pricingVersion: null,
       timeZone: this.reportingTimeZone(providerId, accountKey),

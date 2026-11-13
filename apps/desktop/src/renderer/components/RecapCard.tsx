@@ -24,7 +24,7 @@ export function RecapCard({ linkLabel, recap, ref, theme }: {
   return (
     <div className="atlas-recap" data-period={recap.period} data-theme={theme} ref={ref}>
       <header className="atlas-recap__header">
-        <span className="atlas-recap__brand"><img alt="" height={40} src="./usageatlas.png" width={40} />UsageAtlas</span>
+        <span className="atlas-recap__brand"><img alt="" height={40} src="./activityusage.png" width={40} />Activity Usage</span>
         <span className="atlas-recap__link">{linkLabel}</span>
       </header>
       <div className="atlas-recap__main">

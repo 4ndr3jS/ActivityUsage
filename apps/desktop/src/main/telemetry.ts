@@ -2,8 +2,8 @@ import { app } from "electron";
 import { PostHog } from "posthog-node";
 import type { PreferenceStore } from "./preferences";
 
-declare const USAGEATLAS_POSTHOG_KEY: string;
-declare const USAGEATLAS_POSTHOG_HOST: string;
+declare const ACTIVITY_USAGE_POSTHOG_KEY: string;
+declare const ACTIVITY_USAGE_POSTHOG_HOST: string;
 
 type TelemetryProperty = boolean | number | string;
 
@@ -15,7 +15,7 @@ export class DesktopTelemetry {
   }
 
   get available(): boolean {
-    return USAGEATLAS_POSTHOG_KEY.length > 0;
+    return ACTIVITY_USAGE_POSTHOG_KEY.length > 0;
   }
 
   setEnabled(enabled: boolean): void {
@@ -52,8 +52,8 @@ export class DesktopTelemetry {
 
   private enable(): void {
     if (this.client || !this.available) return;
-    this.client = new PostHog(USAGEATLAS_POSTHOG_KEY, {
-      host: USAGEATLAS_POSTHOG_HOST,
+    this.client = new PostHog(ACTIVITY_USAGE_POSTHOG_KEY, {
+      host: ACTIVITY_USAGE_POSTHOG_HOST,
       persistence: "memory",
       flushAt: 1,
       flushInterval: 10_000,

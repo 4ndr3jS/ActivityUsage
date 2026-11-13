@@ -1,6 +1,6 @@
 # Antigravity, Pi / OMP, and Muse Code
 
-This phase adds local usage history for three coding tools. They appear in the tool settings and are detected when readable session files exist. Run the tool locally, then reload UsageAtlas. These readers need no provider credentials. Subscription limits, balances, and reset times are not collected in this phase.
+This phase adds local usage history for three coding tools. They appear in the tool settings and are detected when readable session files exist. Run the tool locally, then reload Activity Usage. These readers need no provider credentials. Subscription limits, balances, and reset times are not collected in this phase.
 
 The implementation was checked against [CodexBar f795611](https://github.com/steipete/CodexBar/tree/f79561136caa36057d1a743bcb62c5fd43d51089). Keep [the provider audit](provider-audit.md) as the research backlog for subsequent phases.
 
@@ -23,7 +23,7 @@ All three adapters emit the existing `CollectedUsageEvent` format. The existing 
 | Project | Unknown | Session header `cwd` | Unknown |
 | Cost | API-price estimate when a rate is known | API-price estimate when a rate is known | Unknown |
 
-Cache and reasoning counters remain in `rawTokens`. Unknown models retain tokens and increment `unpricedTokens`; missing costs stay null. API-price estimates use UsageAtlas's existing pricing catalog and bundled rates, not the tool's subscription charge. Pi's `usage.cost` is itself an estimate and is not treated as billed money. Model routing suffixes in Antigravity may resolve to a base model for pricing while retaining the recorded ID.
+Cache and reasoning counters remain in `rawTokens`. Unknown models retain tokens and increment `unpricedTokens`; missing costs stay null. API-price estimates use Activity Usage's existing pricing catalog and bundled rates, not the tool's subscription charge. Pi's `usage.cost` is itself an estimate and is not treated as billed money. Model routing suffixes in Antigravity may resolve to a base model for pricing while retaining the recorded ID.
 
 Each source uses the `local` account key. A local transcript does not establish which provider account paid for it. The existing persistence layer hashes source event/session IDs and project paths before cloud storage. Prompts, responses, tool output, and raw log contents are never included in collected records. Pi events stay under Pi; the Codex and Claude readers do not scan Pi roots.
 
@@ -31,7 +31,7 @@ Cloud validators are generated alongside the desktop contract. Deploy the update
 
 ## Session locations
 
-Paths are resolved using the current user's home directory on Windows, macOS, and Linux. Overrides must be absolute or start with `~/`. UsageAtlas must inherit the environment variables when it starts.
+Paths are resolved using the current user's home directory on Windows, macOS, and Linux. Overrides must be absolute or start with `~/`. Activity Usage must inherit the environment variables when it starts.
 
 ### Antigravity
 
@@ -62,7 +62,7 @@ The development machine had IDE `.pb` conversations but no recognized CLI databa
 
 This phase supports the verified `anthropic` and `openai-codex` backend layouts. Other assistant backends make coverage incomplete. Unsupported entries do not appear as measured zero. Matching session and entry IDs deduplicate overlapping roots and copied logs; entries lacking IDs receive a device-scoped file/line identity.
 
-Runtime process discovery, project settings, and process-specific `--session-dir` arguments are not inspected. For a custom session directory, start UsageAtlas with `PI_CODING_AGENT_SESSION_DIR` set to that directory.
+Runtime process discovery, project settings, and process-specific `--session-dir` arguments are not inspected. For a custom session directory, start Activity Usage with `PI_CODING_AGENT_SESSION_DIR` set to that directory.
 
 ### Muse Code
 

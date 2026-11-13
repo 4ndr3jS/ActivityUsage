@@ -1,4 +1,4 @@
-import type { DashboardSnapshot, DashboardWindow } from "@usageatlas/contracts";
+import type { DashboardSnapshot, DashboardWindow } from "@activityusage/contracts";
 import type { UsageAlertPreferences } from "../shared/desktop-api";
 import { describe, expect, it } from "vitest";
 import {

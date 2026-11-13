@@ -4,7 +4,7 @@ import type {
   DashboardWindow,
   UsageDailyMetric,
   UsageTotals
-} from "@usageatlas/contracts";
+} from "@activityusage/contracts";
 
 export interface DashboardSummary {
   connectedProviders: number;

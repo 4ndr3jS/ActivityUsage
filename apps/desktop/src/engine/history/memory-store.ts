@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { HistoryDayPayload, HistoryDayRecord } from "@usageatlas/contracts";
+import type { HistoryDayPayload, HistoryDayRecord } from "@activityusage/contracts";
 import { dayRange } from "./days";
 import { canReplaceSealed, isEmptyHistoryPayload } from "./payload";
 import type { HistoryStore } from "./types";

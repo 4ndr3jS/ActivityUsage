@@ -1,4 +1,4 @@
-import type { DashboardSnapshot, JsonValue } from "@usageatlas/contracts";
+import type { DashboardSnapshot, JsonValue } from "@activityusage/contracts";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import type { EngineImportMessage, EngineMethod, EngineProgressMessage, EngineResponse } from "../engine/protocol";

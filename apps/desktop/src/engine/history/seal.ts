@@ -2,7 +2,7 @@ import {
   type DashboardProvider,
   type HistoryDayPayload,
   type LocalUsageAnalytics
-} from "@usageatlas/contracts";
+} from "@activityusage/contracts";
 import { composeProviderAnalytics } from "./compose";
 import { localCalendarDay, lookbackDays, shiftLocalDay } from "./days";
 import { extractDayPayload, hasUsageTotals, isEmptyHistoryPayload } from "./payload";

@@ -1,4 +1,4 @@
-import type { DashboardSnapshot } from "@usageatlas/contracts";
+import type { DashboardSnapshot } from "@activityusage/contracts";
 import { formatCompactNumber } from "./number-format";
 import { buildPeriodUsage, periodBounds, shiftDay } from "./personal-analytics";
 import { currentStreak, isActiveDay, listNames, PROFILE_SITE, publicProfileUrl } from "./profile-promotion";
@@ -110,5 +110,5 @@ export function blueskyPostUrl(recap: RecapData, link: string): string {
 }
 
 export function recapFileName(recap: RecapData): string {
-  return `usageatlas-${recap.period}-${recap.endDay}.png`;
+  return `activityusage-${recap.period}-${recap.endDay}.png`;
 }

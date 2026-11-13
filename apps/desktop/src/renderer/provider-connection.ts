@@ -1,4 +1,4 @@
-import type { DashboardProvider, ProviderFailure } from "@usageatlas/contracts";
+import type { DashboardProvider, ProviderFailure } from "@activityusage/contracts";
 import { isQuotaProvider } from "../shared/quota-providers";
 
 /**

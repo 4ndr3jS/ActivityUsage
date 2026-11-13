@@ -17,12 +17,12 @@ const resources = path.join(__dirname, "resources");
 // `installer` alongside the DMG background instead.
 const iconDirectory = path.join(resources, "icons");
 const installerDirectory = path.join(resources, "installer");
-const macIcon = path.join(installerDirectory, "usageatlas.icns");
+const macIcon = path.join(installerDirectory, "activityusage.icns");
 const platformIcon = process.platform === "win32"
-  ? path.join(iconDirectory, "usageatlas.ico")
+  ? path.join(iconDirectory, "activityusage.ico")
   : process.platform === "darwin"
     ? macIcon
-    : path.join(iconDirectory, "usageatlas.png");
+    : path.join(iconDirectory, "activityusage.png");
 const windowsSign = process.env.WINDOWS_CERTIFICATE_FILE
   ? {
       certificateFile: process.env.WINDOWS_CERTIFICATE_FILE,
@@ -78,31 +78,31 @@ module.exports = {
         done();
       }
     ],
-    appBundleId: "com.usageatlas.desktop",
+    appBundleId: "com.activityusage.desktop",
     appCategoryType: "public.app-category.developer-tools",
-    appCopyright: "Copyright UsageAtlas contributors",
-    executableName: "UsageAtlas",
+    appCopyright: "Copyright Activity Usage contributors",
+    executableName: "ActivityUsage",
     extraResource: [iconDirectory],
     icon: platformIcon,
-    name: "UsageAtlas",
+    name: "Activity Usage",
     osxSign,
     osxNotarize,
     windowsSign,
     win32metadata: {
-      CompanyName: "UsageAtlas",
+      CompanyName: "Activity Usage",
       FileDescription: "AI provider usage at a glance",
-      InternalName: "UsageAtlas",
-      OriginalFilename: "UsageAtlas.exe",
-      ProductName: "UsageAtlas"
+      InternalName: "Activity Usage",
+      OriginalFilename: "ActivityUsage.exe",
+      ProductName: "Activity Usage"
     }
   },
   rebuildConfig: {},
   makers: [
     new MakerSquirrel({
-      name: "UsageAtlas",
-      authors: "UsageAtlas contributors",
+      name: "Activity Usage",
+      authors: "Activity Usage contributors",
       description: "Cross-platform AI provider usage dashboard",
-      setupIcon: path.join(iconDirectory, "usageatlas.ico"),
+      setupIcon: path.join(iconDirectory, "activityusage.ico"),
       iconUrl: "https://usageatlas.com/icon.ico",
       windowsSign
     }),
@@ -121,31 +121,31 @@ module.exports = {
       options: {
         bin: "appimage-launcher",
         categories: ["Utility", "Development"],
-        icon: path.join(iconDirectory, "usageatlas.png"),
+        icon: path.join(iconDirectory, "activityusage.png"),
         license: path.resolve(__dirname, "../../LICENSE")
       }
     }),
-    // Both default `name` and `bin` to "@usageatlas/desktop"; the rest is what they cannot infer.
+    // Both default `name` and `bin` to "@activityusage/desktop"; the rest is what they cannot infer.
     new MakerRpm({
       options: {
-        name: "usageatlas",
-        bin: "UsageAtlas",
+        name: "activityusage",
+        bin: "ActivityUsage",
         genericName: "AI usage dashboard",
         categories: ["Utility", "Development"],
         homepage: "https://usageatlas.com",
         license: "MIT",
-        icon: path.join(iconDirectory, "usageatlas.png")
+        icon: path.join(iconDirectory, "activityusage.png")
       }
     }),
     new MakerDeb({
       options: {
-        name: "usageatlas",
-        bin: "UsageAtlas",
+        name: "activityusage",
+        bin: "ActivityUsage",
         genericName: "AI usage dashboard",
         categories: ["Utility", "Development"],
-        maintainer: "UsageAtlas contributors",
+        maintainer: "Activity Usage contributors",
         homepage: "https://usageatlas.com",
-        icon: path.join(iconDirectory, "usageatlas.png")
+        icon: path.join(iconDirectory, "activityusage.png")
       }
     })
   ],

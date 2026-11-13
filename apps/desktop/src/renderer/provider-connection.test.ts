@@ -1,4 +1,4 @@
-import type { DashboardProvider, LocalUsageAnalytics, UsageTotals } from "@usageatlas/contracts";
+import type { DashboardProvider, LocalUsageAnalytics, UsageTotals } from "@activityusage/contracts";
 import { describe, expect, it } from "vitest";
 import { providerConnection, reconnectSentence } from "./provider-connection";
 

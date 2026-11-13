@@ -1,4 +1,4 @@
-import type { DashboardWindow, LocalUsageAnalytics } from "@usageatlas/contracts";
+import type { DashboardWindow, LocalUsageAnalytics } from "@activityusage/contracts";
 import { readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";

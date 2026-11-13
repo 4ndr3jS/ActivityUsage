@@ -1,6 +1,6 @@
 # Changelog
 
-All notable UsageAtlas desktop changes are recorded here.
+All notable Activity Usage desktop changes are recorded here.
 
 ## 0.2.2 — 2026-07-19
 
@@ -13,7 +13,7 @@ All notable UsageAtlas desktop changes are recorded here.
 ### Changed
 
 - Replaced the orange visual language with a graphite-first Cursor-style palette and made graphite the default appearance.
-- Restored the real UsageAtlas artwork inside the custom title bar and sidebar.
+- Restored the real Activity Usage artwork inside the custom title bar and sidebar.
 - Reduced card and control corners to a 2–6 px radius scale and disabled native rounded window corners.
 - Unified all interface, metric, table, and diagnostic typography on one CursorGothic-first sans stack.
 

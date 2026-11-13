@@ -1,10 +1,10 @@
-import type { DashboardProvider } from "@usageatlas/contracts";
+import type { DashboardProvider } from "@activityusage/contracts";
 import type { EngineDiagnostics, EngineStatus } from "../../shared/desktop-api";
 import { Alert, Button, Card, Skeleton, Tooltip } from "@heroui/react";
 import { CloseIcon, ExternalIcon, RefreshIcon } from "../icons";
 import { providerConnection } from "../provider-connection";
 
-const REPOSITORY_URL = "https://github.com/SRX9/UsageAtlas";
+const REPOSITORY_URL = "https://github.com/4ndr3jS/ActivityUsage";
 
 /**
  * Something the usage numbers should be read against — a source that needs a new
@@ -44,7 +44,7 @@ export function Diagnostics({
           <p className="atlas-kicker">Support</p>
           <h1 className="atlas-page-title">Engine health</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted">
-            The local UsageAtlas engine, and anything that qualifies the usage numbers.
+            The local Activity Usage engine, and anything that qualifies the usage numbers.
           </p>
         </div>
         <Button isPending={loading} onPress={() => void onReload()} variant="outline">
@@ -154,7 +154,7 @@ export function Diagnostics({
         </Card.Header>
         <Card.Content>
           <Button onPress={() => void onOpenExternal(REPOSITORY_URL)} variant="outline">
-            <span>Open UsageAtlas on GitHub</span>
+            <span>Open Activity Usage on GitHub</span>
             <ExternalIcon className="size-4" />
           </Button>
         </Card.Content>

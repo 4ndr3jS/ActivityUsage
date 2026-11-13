@@ -15,7 +15,7 @@ const homes: string[] = [];
 const context = () => ({ now, signal: new AbortController().signal, timeZone: "UTC" });
 afterEach(async () => { await Promise.all(homes.splice(0).map(home => rm(home, { recursive: true, force: true }))); });
 async function setup(provider: "codex" | "claude", options: { maxFiles?: number; maxLineBytes?: number } = {}) {
-  const home = await mkdtemp(path.join(tmpdir(), "usageatlas-parsing-")); homes.push(home);
+  const home = await mkdtemp(path.join(tmpdir(), "activityusage-parsing-")); homes.push(home);
   const folder = path.join(home, provider === "codex" ? ".codex/sessions" : ".claude/projects/project");
   await mkdir(folder, { recursive: true });
   const file = path.join(folder, "session.jsonl");
@@ -185,7 +185,7 @@ describe("aggregation and pricing invariants", () => {
 
 describe("OpenCode validation", () => {
   async function scanRows(messages: object[], options: { maxRecords?: number } = {}) {
-    const home = await mkdtemp(path.join(tmpdir(), "usageatlas-opencode-audit-")); homes.push(home);
+    const home = await mkdtemp(path.join(tmpdir(), "activityusage-opencode-audit-")); homes.push(home);
     const locations = openCodeLocations({ homeDirectory: home, environment: {} });
     await mkdir(locations.root, { recursive: true });
     const db = new DatabaseSync(locations.database);

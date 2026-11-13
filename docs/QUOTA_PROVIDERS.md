@@ -10,7 +10,7 @@ Open **Settings → Sources**, expand **Connect** under the tool, enter its cred
 
 Saved credentials use Electron `safeStorage` and the operating system's encryption service. They are kept separately from preferences and history, excluded from cloud saves, and never returned to the renderer after saving. On Linux, an unavailable keyring or the `basic_text` backend prevents saving.
 
-Environment credentials are read from the process that started UsageAtlas. Restart the app after changing them. A saved credential takes precedence over the environment, which takes precedence over supported local credential files. An invalid selected credential does not silently switch to a different account.
+Environment credentials are read from the process that started Activity Usage. Restart the app after changing them. A saved credential takes precedence over the environment, which takes precedence over supported local credential files. An invalid selected credential does not silently switch to a different account.
 
 | Tool | Credential or local discovery | Data collected |
 | --- | --- | --- |

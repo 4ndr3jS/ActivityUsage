@@ -17,7 +17,7 @@ tmp/
 *.key
 *.mobileprovision
 
-# Provider credentials and local usage data. UsageAtlas reads these from the
+# Provider credentials and local usage data. Activity Usage reads these from the
 # developer's real home directory; none of them belong in a commit.
 .credentials.json
 auth.json

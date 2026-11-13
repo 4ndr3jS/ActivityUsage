@@ -1,4 +1,4 @@
-import type { DashboardProvider } from "@usageatlas/contracts";
+import type { DashboardProvider } from "@activityusage/contracts";
 import type { ProviderCredential } from "../shared/quota-providers";
 
 export interface ProviderContext {

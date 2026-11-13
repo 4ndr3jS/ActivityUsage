@@ -1,8 +1,8 @@
-# CodexBar provider audit for UsageAtlas
+# CodexBar provider audit for Activity Usage
 
 Researched 27 September 2026 against [upstream commit f795611](https://github.com/steipete/CodexBar/blob/f79561136caa36057d1a743bcb62c5fd43d51089/). The provider overview lists 87 IDs. Inspected fetchers, local readers, plugin parsers, capability declarations and selected fixture tests. This was source research, not authenticated live-account testing; the Swift suite was not run. Ratings are my engineering judgment.
 
-At the time of this research, UsageAtlas registered Codex, Claude, Cursor and OpenCode. The research itself changed no application code. Phase 1 implementation is recorded at the end of this document.
+At the time of this research, Activity Usage registered Codex, Claude, Cursor and OpenCode. The research itself changed no application code. Phase 1 implementation is recorded at the end of this document.
 
 A historical pipeline provides timestamped usage events or explicit daily aggregates. A quota pipeline provides current allowance, use, balance and reset. Polling snapshots cannot reconstruct missing request counts, models, token history or activity while the tracker was closed. Balance changes alone are not spend because top-ups, refunds and expiry also affect them.
 
@@ -39,7 +39,7 @@ My preferred history candidates are Antigravity, Pi/OMP and Muse Code. Mistral i
 
 ## Extend existing OpenCode
 
-[OpenCode Go](https://github.com/steipete/CodexBar/blob/f79561136caa36057d1a743bcb62c5fd43d51089/docs/opencodego.md) uses `https://opencode.ai/zen/go/v1/usage` and workspace console endpoints for Go status and prepaid balance. It can add reported five-hour, weekly and monthly windows. Its local SQLite source overlaps with UsageAtlas's existing OpenCode reader, so quota/balance is an extension and must not duplicate the local usage events.
+[OpenCode Go](https://github.com/steipete/CodexBar/blob/f79561136caa36057d1a743bcb62c5fd43d51089/docs/opencodego.md) uses `https://opencode.ai/zen/go/v1/usage` and workspace console endpoints for Go status and prepaid balance. It can add reported five-hour, weekly and monthly windows. Its local SQLite source overlaps with Activity Usage's existing OpenCode reader, so quota/balance is an extension and must not duplicate the local usage events.
 
 ## Coding subscription and gateway backends
 
@@ -89,7 +89,7 @@ Selected inspected tests include [Antigravity independent token/time fixtures](h
 
 The flag `supportsTokenCost` alone is misleading: Muse has tokens but no dollars; Grok has coarse context counters; MiniMax and z.ai expose optional chart data despite not advertising native cost support. Judge the actual data reader.
 
-CodexBar's browser imports, Keychain readers, process probes and paths often target macOS/Linux. UsageAtlas needs independent Windows/macOS/Linux validation. API-key and plain JSON/SQLite sources are generally easier to port than browser-session imports.
+CodexBar's browser imports, Keychain readers, process probes and paths often target macOS/Linux. Activity Usage needs independent Windows/macOS/Linux validation. API-key and plain JSON/SQLite sources are generally easier to port than browser-session imports.
 
 Google confirms the consumer Gemini CLI/Code Assist OAuth shutdown and the continuing Standard/Enterprise service in its [official deprecation notice](https://developers.google.com/gemini-code-assist/docs/deprecations/code-assist-individuals).
 
@@ -98,7 +98,7 @@ Google confirms the consumer Gemini CLI/Code Assist OAuth shutdown and the conti
 
 Selected Antigravity, Pi / OMP, and Muse Code. The desktop adapters now collect local historical usage through the existing event, daily/hourly, model, session, and cloud contract pipeline. Pi also maps projects. Detailed mappings, supported roots, and explicit limits are in [LOCAL_PROVIDERS.md](LOCAL_PROVIDERS.md).
 
-This first phase implements historical usage. Subscription quota APIs, account attribution, and browser or credential access remain separate future work. Antigravity uses verified SQLite layouts; Pi supports the verified Anthropic and OpenAI Codex layouts; Muse costs remain unknown. The original research snapshot above describes CodexBar capabilities, which are broader than the implemented UsageAtlas scope.
+This first phase implements historical usage. Subscription quota APIs, account attribution, and browser or credential access remain separate future work. Antigravity uses verified SQLite layouts; Pi supports the verified Anthropic and OpenAI Codex layouts; Muse costs remain unknown. The original research snapshot above describes CodexBar capabilities, which are broader than the implemented Activity Usage scope.
 
 ### Review fixes
 
@@ -162,7 +162,7 @@ The release dependency audit initially failed on two high-severity `fast-uri` ad
 
 The tool sandbox blocked network downloads and Electron's Windows encryption/GPU services on the first attempts. Authorized runs outside that restriction completed successfully. The Windows installer is unsigned, as permitted by the existing release workflow. Generated icon changes from the packaging prerequisite were reverted after building; provider work was preserved.
 
-Local evidence is under `tmp/release-readiness-*`. The current installer is `apps/desktop/out/make/squirrel.windows/x64/UsageAtlas-0.2.13 Setup.exe`; the ZIP is `apps/desktop/out/make/zip/win32/x64/UsageAtlas-win32-x64-0.2.13.zip`. An older `0.2.11` ZIP in that output directory is excluded from this run's checksum manifest.
+Local evidence is under `tmp/release-readiness-*`. The current installer is `apps/desktop/out/make/squirrel.windows/x64/Activity Usage-0.2.13 Setup.exe`; the ZIP is `apps/desktop/out/make/zip/win32/x64/Activity Usage-win32-x64-0.2.13.zip`. An older `0.2.11` ZIP in that output directory is excluded from this run's checksum manifest.
 
 Before publishing, deploy the updated cloud contracts. Their production deployment has not been verified. macOS and Linux builds, signing/notarization and native smoke tests still need the release CI runners. Live authenticated comparisons for the new providers and an installed-app upgrade from the previous published version remain unverified. The packaged startup test does not establish those results.
 

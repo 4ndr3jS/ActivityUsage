@@ -1,7 +1,7 @@
-import claudeFixture from "@usageatlas/contracts/fixtures/providers/claude-oauth-usage.json";
-import codexFixture from "@usageatlas/contracts/fixtures/providers/codex-oauth-usage.json";
-import cursorFixture from "@usageatlas/contracts/fixtures/providers/cursor-usage-summary.json";
-import cursorEventsFixture from "@usageatlas/contracts/fixtures/providers/cursor-usage-events.json";
+import claudeFixture from "@activityusage/contracts/fixtures/providers/claude-oauth-usage.json";
+import codexFixture from "@activityusage/contracts/fixtures/providers/codex-oauth-usage.json";
+import cursorFixture from "@activityusage/contracts/fixtures/providers/cursor-usage-summary.json";
+import cursorEventsFixture from "@activityusage/contracts/fixtures/providers/cursor-usage-events.json";
 import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -185,7 +185,7 @@ describe("provider adapters", () => {
 });
 
 async function createHome(): Promise<string> {
-  const directory = await mkdtemp(path.join(tmpdir(), "usageatlas-provider-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "activityusage-provider-"));
   directories.push(directory);
   return directory;
 }

@@ -1,4 +1,4 @@
-import type { DashboardSnapshot, UsageHourlyMetric, UsageTotals } from "@usageatlas/contracts";
+import type { DashboardSnapshot, UsageHourlyMetric, UsageTotals } from "@activityusage/contracts";
 import { sumUsageTotals } from "./dashboard-model";
 import { formatHourOfDay } from "./time-format";
 import {

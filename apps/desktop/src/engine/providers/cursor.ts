@@ -1,4 +1,4 @@
-import type { DashboardProvider } from "@usageatlas/contracts";
+import type { DashboardProvider } from "@activityusage/contracts";
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
@@ -131,7 +131,7 @@ async function refreshCursor(
     Cookie: cookie,
     Origin: "https://cursor.com",
     Referer: "https://cursor.com/dashboard",
-    "User-Agent": "UsageAtlas"
+    "User-Agent": "ActivityUsage"
   };
   const historyDays = context.historyDaysForAccount(credential.userID);
   const analyticsPromise = scanCursorUsageHistory(context, headers, {

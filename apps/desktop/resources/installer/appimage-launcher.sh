@@ -2,7 +2,7 @@
 # An AppImage mounts nosuid, so user namespaces are Chromium's only sandbox here.
 set -eu
 
-app="$(dirname "$(readlink -f "$0")")/UsageAtlas"
+app="$(dirname "$(readlink -f "$0")")/Activity Usage"
 
 if command -v unshare >/dev/null 2>&1; then
   unshare --user --map-root-user true >/dev/null 2>&1 || set -- --no-sandbox "$@"

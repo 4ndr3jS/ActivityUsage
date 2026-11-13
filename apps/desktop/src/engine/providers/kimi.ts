@@ -1,4 +1,4 @@
-import type { QuotaMetric } from "@usageatlas/contracts";
+import type { QuotaMetric } from "@activityusage/contracts";
 import { bearer, date, metric, number, quotaAdapter, quotaJson, reading, record, type QuotaOptions, type QuotaReading } from "./quota-shared";
 
 export function createKimiAdapter(options: QuotaOptions = {}) {

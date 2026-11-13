@@ -1,4 +1,4 @@
-import type { DashboardProvider, DashboardWindow } from "@usageatlas/contracts";
+import type { DashboardProvider, DashboardWindow } from "@activityusage/contracts";
 
 export interface LimitEntry {
   provider: DashboardProvider;

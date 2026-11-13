@@ -4,7 +4,7 @@ import {
   type HistoryDayPayload,
   type LocalUsageAnalytics,
   type UsageTotals
-} from "@usageatlas/contracts";
+} from "@activityusage/contracts";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -109,7 +109,7 @@ describe("HistoryStore", () => {
   });
 
   it("keeps pending versions across restart and does not dirty a repeated scan", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "usageatlas-pending-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "activityusage-pending-"));
     directories.push(directory);
     const filename = path.join(directory, "history.sqlite");
     const first = SqliteHistoryStore.open(filename);
@@ -125,7 +125,7 @@ describe("HistoryStore", () => {
   });
 
   it("migrates usable legacy rows once, keeping local detail out of cloud records", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "usageatlas-migration-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "activityusage-migration-"));
     directories.push(directory);
     const filename = path.join(directory, "history.sqlite");
     const db = openWritableSqlite(filename);
@@ -174,7 +174,7 @@ describe("HistoryStore", () => {
     } finally { await a.close(); await b.close(); }
   });
   it("persists a stable replica id and change sequence across sqlite reopen", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "usageatlas-history-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "activityusage-history-"));
     directories.push(directory);
     const databasePath = path.join(directory, "history.sqlite");
     const first = SqliteHistoryStore.open(databasePath);
@@ -192,7 +192,7 @@ describe("HistoryStore", () => {
   });
 
   it("lets sqlite replace a sealed partial day and refuses empty inserts", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "usageatlas-history-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "activityusage-history-"));
     directories.push(directory);
     const store = SqliteHistoryStore.open(path.join(directory, "history.sqlite"));
     expect(store.sealDay("claude", HISTORY_LOCAL_ACCOUNT_KEY, "2026-08-18", payload({ totals: tokens(0) })))
@@ -716,7 +716,7 @@ describe("EngineService history integration", () => {
   });
 
   it("skips corrupt sqlite payloads without dropping neighboring days", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "usageatlas-history-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "activityusage-history-"));
     directories.push(directory);
     const databasePath = path.join(directory, "history.sqlite");
     const store = SqliteHistoryStore.open(databasePath);

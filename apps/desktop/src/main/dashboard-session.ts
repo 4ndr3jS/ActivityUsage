@@ -1,4 +1,4 @@
-import type { DashboardSnapshot } from "@usageatlas/contracts";
+import type { DashboardSnapshot } from "@activityusage/contracts";
 import type { LocalImportProgress, DashboardState, RefreshProgress } from "../shared/desktop-api";
 import type { EngineManager } from "./engine-manager";
 

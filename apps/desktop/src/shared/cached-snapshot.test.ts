@@ -1,4 +1,4 @@
-import type { DashboardSnapshot } from "@usageatlas/contracts";
+import type { DashboardSnapshot } from "@activityusage/contracts";
 import { describe, expect, it } from "vitest";
 import { snapshotHasCachedUsage } from "./cached-snapshot";
 

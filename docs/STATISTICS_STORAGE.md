@@ -1,10 +1,10 @@
 # Statistics storage
 
-UsageAtlas stores private numeric observations separately from daily display summaries. The desktop database is SQLite; the hosted account database is PostgreSQL. Both use the same versioned JSON contract and SHA-256 content validation.
+Activity Usage stores private numeric observations separately from daily display summaries. The desktop database is SQLite; the hosted account database is PostgreSQL. Both use the same versioned JSON contract and SHA-256 content validation.
 
 ## What is retained
 
-`usage_fact` is an append-only observation ledger, scoped to the signed-in UsageAtlas account. Its three kinds are:
+`usage_fact` is an append-only observation ledger, scoped to the signed-in Activity Usage account. Its three kinds are:
 
 - `usage_event`: the source timestamp in UTC, reporting timezone, original and normalized model identifiers, token categories, numeric source counters, reported and estimated costs, parser/pricing revision, service tier, and opaque session/project identifiers when available.
 - `collection`: coverage dates, status, parser/pricing revision, source-file and processed-record counts, and a machine-readable failure reason. A partial collection does not prove that missing days had zero usage.

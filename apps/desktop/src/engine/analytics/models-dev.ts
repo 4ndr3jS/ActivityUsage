@@ -129,7 +129,7 @@ export async function loadPricingCatalog(options: {
 }
 
 export function modelsDevCachePath(homeDirectory: string): string {
-  return path.join(homeDirectory, ".usageatlas", "model-pricing", "models-dev-v1.json");
+  return path.join(homeDirectory, ".activityusage", "model-pricing", "models-dev-v1.json");
 }
 
 async function fetchModelsDev(fetchImplementation: FetchImplementation, signal: AbortSignal): Promise<unknown> {

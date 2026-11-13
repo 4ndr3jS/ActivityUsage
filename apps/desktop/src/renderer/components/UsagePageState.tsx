@@ -135,7 +135,7 @@ export function UsageEmpty({ onOpenSettings }: { onOpenSettings(): void }): Reac
         <EmptyState.Header>
           <EmptyState.Media variant="icon"><ProvidersIcon className="size-6" /></EmptyState.Media>
           <EmptyState.Title>No tools are reporting yet</EmptyState.Title>
-          <EmptyState.Description>Choose the AI tools you use, then UsageAtlas will collect their local usage summaries.</EmptyState.Description>
+          <EmptyState.Description>Choose the AI tools you use, then Activity Usage will collect their local usage summaries.</EmptyState.Description>
         </EmptyState.Header>
         <EmptyState.Content><Button onPress={onOpenSettings}>Open settings</Button></EmptyState.Content>
       </EmptyState>

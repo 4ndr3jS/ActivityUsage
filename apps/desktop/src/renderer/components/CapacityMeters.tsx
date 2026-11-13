@@ -1,4 +1,4 @@
-import type { DashboardProvider } from "@usageatlas/contracts";
+import type { DashboardProvider } from "@activityusage/contracts";
 import { Button, Card } from "@heroui/react";
 import { useId } from "react";
 import "../capacity-meters.css";

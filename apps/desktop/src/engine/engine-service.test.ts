@@ -1,11 +1,11 @@
-import dashboardFixture from "@usageatlas/contracts/fixtures/dashboard-v2.json";
+import dashboardFixture from "@activityusage/contracts/fixtures/dashboard-v2.json";
 import {
   HISTORY_DAY_PAYLOAD_VERSION,
   HISTORY_LOCAL_ACCOUNT_KEY,
   type HistoryDayPayload,
   type JsonValue,
   type UsageTotals
-} from "@usageatlas/contracts";
+} from "@activityusage/contracts";
 import type { ProviderAdapter } from "./provider";
 import { describe, expect, it, vi } from "vitest";
 import { validateDashboard } from "../main/dashboard-validation";

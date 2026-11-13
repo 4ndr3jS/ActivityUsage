@@ -43,7 +43,7 @@ export class PublicLeaderboard {
     try {
       response = await fetch(`${this.baseURL}/api/leaderboard`, { signal: AbortSignal.timeout(15_000), redirect: "error" });
     } catch {
-      throw new Error("Could not reach UsageAtlas.");
+      throw new Error("Could not reach Activity Usage.");
     }
     if (!response.ok) throw new Error("Leaderboard unavailable.");
     const body = await readLimited(response, MAX_BOARD_BYTES);

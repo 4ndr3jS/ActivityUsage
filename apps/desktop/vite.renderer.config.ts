@@ -23,7 +23,7 @@ export default defineConfig(({ command }) => {
     html: isDevelopment ? { cspNonce: developmentStyleNonce } : undefined,
     plugins: [
       {
-        name: "usageatlas-renderer-csp",
+        name: "activityusage-renderer-csp",
         transformIndexHtml(html: string) {
           const nonceSource = isDevelopment ? ` 'nonce-${developmentStyleNonce}'` : "";
           const connectSource = isDevelopment ? " ws://localhost:* ws://127.0.0.1:*" : "";

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { DashboardProvider, QuotaMetric } from "@usageatlas/contracts";
+import type { DashboardProvider, QuotaMetric } from "@activityusage/contracts";
 import type { ProviderAdapter, ProviderContext } from "../provider";
 import { ProviderError } from "../provider";
 import type { FetchImplementation } from "../platform/http";

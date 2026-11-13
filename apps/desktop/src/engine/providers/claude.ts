@@ -1,4 +1,4 @@
-import type { DashboardProvider } from "@usageatlas/contracts";
+import type { DashboardProvider } from "@activityusage/contracts";
 import type { ProviderAdapter, ProviderContext } from "../provider";
 import { ProviderError } from "../provider";
 import { LocalUsageScanner, type AnalyticsScanner, type AnalyticsScanContext } from "../analytics/local-usage";

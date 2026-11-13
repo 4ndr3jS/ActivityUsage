@@ -52,10 +52,10 @@ export function AppShell({ route, onNavigate, updateControl, children }: AppShel
 
   return (
     <div className="atlas-app-shell">
-      <header aria-label="UsageAtlas" className="atlas-app-shell__titlebar drag-region">
+      <header aria-label="Activity Usage" className="atlas-app-shell__titlebar drag-region">
         <div className="atlas-app-shell__brand">
-          <span aria-hidden="true" className="atlas-app-shell__brand-mark"><img alt="" src="./usageatlas.png" /></span>
-          <span className="atlas-app-shell__brand-name">UsageAtlas</span>
+          <span aria-hidden="true" className="atlas-app-shell__brand-mark"><img alt="" src="./activityusage.png" /></span>
+          <span className="atlas-app-shell__brand-name">Activity Usage</span>
           {updateControl}
           <span aria-hidden="true" className="atlas-app-shell__brand-divider" />
           <span className="atlas-app-shell__route-name">{routeTitles[route]}</span>

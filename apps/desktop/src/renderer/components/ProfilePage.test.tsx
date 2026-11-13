@@ -1,5 +1,5 @@
-import fixtureSnapshot from "@usageatlas/contracts/fixtures/dashboard-v2.json";
-import type { DashboardSnapshot } from "@usageatlas/contracts";
+import fixtureSnapshot from "@activityusage/contracts/fixtures/dashboard-v2.json";
+import type { DashboardSnapshot } from "@activityusage/contracts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CloudProfileStatus, CloudStatus, LeaderboardGlance } from "../../shared/desktop-api";
@@ -97,7 +97,7 @@ describe("Profile page", () => {
     const html = render(status(account, { state: "public", handle: "ada_l" }));
 
     expect(html).toContain("Put your usage in your README");
-    expect(html).toContain("[![AI Coding Activity on UsageAtlas](https://usageatlas.com/api/cards/ada_l/heatmap.svg?theme=light)](https://usageatlas.com/@ada_l)");
+    expect(html).toContain("[![AI Coding Activity on Activity Usage](https://usageatlas.com/api/cards/ada_l/heatmap.svg?theme=light)](https://usageatlas.com/@ada_l)");
     expect(html).toContain('src="https://usageatlas.com/api/cards/ada_l/heatmap.svg?theme=light"');
     expect(html).toContain("Copy Markdown");
     expect(html).toContain("More styles on usageatlas.com");

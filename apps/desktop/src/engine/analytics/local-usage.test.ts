@@ -1,5 +1,5 @@
-import claudeSession from "@usageatlas/contracts/fixtures/analytics/claude-session.json";
-import codexSession from "@usageatlas/contracts/fixtures/analytics/codex-session.json";
+import claudeSession from "@activityusage/contracts/fixtures/analytics/claude-session.json";
+import codexSession from "@activityusage/contracts/fixtures/analytics/codex-session.json";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -434,7 +434,7 @@ function context() {
 }
 
 async function createHome(): Promise<string> {
-  const directory = await mkdtemp(path.join(tmpdir(), "usageatlas-analytics-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "activityusage-analytics-"));
   directories.push(directory);
   return directory;
 }

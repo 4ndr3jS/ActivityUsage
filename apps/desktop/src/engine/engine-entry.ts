@@ -11,7 +11,7 @@ import { createProviderAdapters } from "./providers/registry";
 const port = process.parentPort;
 if (!port) throw new Error("Engine utility process parent port is unavailable");
 
-const history = openHistoryStore(process.env.USAGEATLAS_HISTORY_DB);
+const history = openHistoryStore(process.env.ACTIVITY_USAGE_HISTORY_DB);
 if (history instanceof SqliteHistoryStore) process.env.TZ = history.usage.setting("reporting-timezone")!;
 const engine = new EngineService(
   createProviderAdapters(),

@@ -3,7 +3,7 @@ import type {
   DashboardSnapshot,
   UsageDailyMetric,
   UsageTotals
-} from "@usageatlas/contracts";
+} from "@activityusage/contracts";
 import { sumUsageTotals } from "./dashboard-model";
 
 export type AnalyticsRange = 7 | 30 | 90 | "all";

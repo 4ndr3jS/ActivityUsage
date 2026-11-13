@@ -9,7 +9,7 @@ describe("README cards", () => {
 
   it("writes the same Markdown as the website's builder", () => {
     expect(readmeCardMarkdown("ada_l", "tokens", "all", "light")).toBe(
-      "[![AI Coding Token Usage on UsageAtlas](https://usageatlas.com/api/cards/ada_l/tokens.svg?period=all&theme=light)](https://usageatlas.com/@ada_l)"
+      "[![AI Coding Token Usage on Activity Usage](https://usageatlas.com/api/cards/ada_l/tokens.svg?period=all&theme=light)](https://usageatlas.com/@ada_l)"
     );
   });
 

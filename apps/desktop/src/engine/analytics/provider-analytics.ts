@@ -1,4 +1,4 @@
-import type { LocalUsageAnalytics, ProviderFailure } from "@usageatlas/contracts";
+import type { LocalUsageAnalytics, ProviderFailure } from "@activityusage/contracts";
 import { ProviderError } from "../provider";
 import type { AnalyticsProvider, AnalyticsScanner, AnalyticsScanContext } from "./local-usage";
 import { unavailableAnalytics } from "./local-usage";

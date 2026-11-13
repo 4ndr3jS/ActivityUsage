@@ -32,5 +32,5 @@ export function readmeCardUrl(handle: string, card: ReadmeCard, period: ReadmePe
 
 /** The same Markdown as the website's builder: the card links to the profile. */
 export function readmeCardMarkdown(handle: string, card: ReadmeCard, period: ReadmePeriod, theme: ReadmeTheme): string {
-  return `[![${README_CARDS[card].title} on UsageAtlas](${readmeCardUrl(handle, card, period, theme)})](${PROFILE_SITE}/@${handle})`;
+  return `[![${README_CARDS[card].title} on Activity Usage](${readmeCardUrl(handle, card, period, theme)})](${PROFILE_SITE}/@${handle})`;
 }
