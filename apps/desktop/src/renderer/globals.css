@@ -887,6 +887,54 @@
   color: var(--foreground);
 }
 
+.atlas-time-date-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-block-start: 4px;
+}
+
+/* Native date input, styled explicitly: the browser control ships with its own
+   chrome, so it needs the shared field surface, border, and focus ring. */
+.atlas-time-date {
+  width: 100%;
+  min-height: 40px;
+  padding-inline: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--field-background);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.atlas-time-date:hover {
+  border-color: color-mix(in oklab, var(--foreground) 22%, transparent);
+}
+
+.atlas-time-date:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 18%, transparent);
+}
+
+.atlas-time-date::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.atlas-time-date::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+  .atlas-time-date {
+    color-scheme: dark;
+  }
+}
+
 .atlas-compare-toggle {
   min-height: 40px;
   justify-content: center;

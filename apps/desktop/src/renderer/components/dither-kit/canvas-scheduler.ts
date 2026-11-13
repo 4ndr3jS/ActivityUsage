@@ -1,15 +1,22 @@
 export interface CanvasScheduler {
-  invalidate(): void
+  /**
+   * Ask for a repaint. `full` means the painted surface itself changed (data,
+   * geometry, series) so the expensive fill must be rebuilt. `false` means only
+   * an overlay changed (crosshair, hover highlight) and the cached fill can be
+   * blitted — which keeps pointer movement off the dither hot path.
+   */
+  invalidate(full?: boolean): void
   dispose(): void
 }
 
 /** Paint only while visible and dirty, or while an interaction is settling. */
 export function scheduleCanvas(
   canvas: HTMLCanvasElement,
-  draw: (now: number, dirty: boolean) => boolean | void,
+  draw: (now: number, full: boolean) => boolean | void,
 ): CanvasScheduler {
   let frame = 0
   let dirty = true
+  let fullPaint = true
   let visible = false
   let disposed = false
   const request = () => {
@@ -20,11 +27,16 @@ export function scheduleCanvas(
   const paint = (now: number) => {
     frame = 0
     if (disposed || !visible || document.hidden) return
-    const repaint = dirty
+    const full = fullPaint
+    fullPaint = false
     dirty = false
-    if (draw(now, repaint) || dirty) request()
+    if (draw(now, full) || dirty) request()
   }
-  const invalidate = () => { dirty = true; request() }
+  const invalidate = (full = true) => {
+    dirty = true
+    fullPaint = fullPaint || full
+    request()
+  }
   const cancel = () => { cancelAnimationFrame(frame); frame = 0 }
   const visibilityChanged = () => {
     if (document.hidden) cancel()

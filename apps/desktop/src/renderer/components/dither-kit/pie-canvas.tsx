@@ -127,10 +127,10 @@ export function PieCanvas() {
       }
     }
 
-    const draw = (now: number, dirty: boolean) => {
+    const draw = (now: number, full: boolean) => {
       const s = state.current
       if (!s.ready || !s.pie) return
-      if (dirty) needsFill = true
+      if (full) needsFill = true
       if (s.revision !== lastRevision) {
         lastRevision = s.revision
         animStart = 0

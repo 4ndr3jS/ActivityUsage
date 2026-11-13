@@ -136,6 +136,8 @@
 .activity-source-card dl > div { display: grid; grid-template-columns: 150px minmax(0, 1fr); align-items: baseline; gap: 16px; font-size: 12px; }
 .activity-source-card dt { color: var(--activity-tertiary); }
 .activity-source-card dd { margin: 0; text-align: right; overflow-wrap: anywhere; color: var(--activity-secondary); }
+.activity-source-card dd > span { display: block; }
+.activity-source-card dd > span + span { margin-top: 3px; }
 .activity-source-card dl > div:first-child dd { font-size: 11px; font-family: ui-monospace, monospace; }
 .activity-source-error { color: var(--warning); font-size: 12px; padding-top: 12px; }
 .activity-privacy-card h2 { margin-bottom: 20px; }

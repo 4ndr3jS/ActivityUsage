@@ -1,5 +1,5 @@
 import type { DashboardProvider } from "@activityusage/contracts";
-import { Button, Input, Label, ListBox, Popover, Select, Tooltip } from "@heroui/react";
+import { Button, Label, ListBox, Popover, Select, Tooltip } from "@heroui/react";
 import { useState } from "react";
 import type { AnalyticsRange, ProviderScope } from "../personal-analytics";
 import {
@@ -93,9 +93,10 @@ export function TimeNavigator({
                 <span className="flex-1 text-start">Yesterday</span>
                 {mode === "day" && selectedDay === yesterday ? <CheckIcon className="atlas-time-option__check" /> : null}
               </Button>
-              <div className="flex flex-col gap-1 pt-1">
+              <div className="atlas-time-date-field">
                 <Label htmlFor="usage-day">Date</Label>
-                <Input
+                <input
+                  className="atlas-time-date"
                   id="usage-day"
                   max={todayValue()}
                   onChange={(event) => {
@@ -105,7 +106,6 @@ export function TimeNavigator({
                   }}
                   type="date"
                   value={mode === "day" ? selectedDay : ""}
-                  variant="secondary"
                 />
               </div>
             </div>

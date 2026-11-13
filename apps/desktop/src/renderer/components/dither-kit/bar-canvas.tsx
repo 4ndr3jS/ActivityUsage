@@ -139,10 +139,10 @@ export function BarCanvas() {
     let lastSelected: string | null | undefined = Symbol() as never
     let lastHover: number | null | undefined = Symbol() as never
 
-    const draw = (now: number, dirty: boolean) => {
+    const draw = (now: number, full: boolean) => {
       const s = state.current
       if (!s.ready) return
-      if (dirty) needsFill = true
+      if (full) needsFill = true
       if (s.revision !== lastRevision) {
         lastRevision = s.revision
         animStart = 0 // re-play the wave on data change / replay

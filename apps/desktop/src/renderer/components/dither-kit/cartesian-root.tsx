@@ -5,6 +5,8 @@ import {
   type ComponentType,
   isValidElement,
   type ReactNode,
+  useEffect,
+  useRef,
 } from "react"
 import {
   type ChartConfig,
@@ -136,9 +138,41 @@ export function CartesianRoot<TData extends Row>({
     const rect = el.getBoundingClientRect()
     const px = clientX - rect.left - margins.left
     const index = ctx.indexAtX(px)
-    ctx.setHoverIndex(index)
+    // Pointers fire faster than the display refreshes; only commit when the
+    // scrubbed band actually changes so a slow drag doesn't re-render per event.
+    if (index !== ctx.hoverIndex) {
+      ctx.setHoverIndex(index)
+      onHoverChange?.(index)
+    }
     ctx.setCursorX(clientX - rect.left)
-    onHoverChange?.(index)
+  }
+
+  // Coalesce pointer moves to one commit per animation frame. The handler is
+  // read through a ref so the scheduled frame always uses the latest render's
+  // scales/handlers instead of a stale closure.
+  const moveRef = useRef(onMove)
+  const pendingX = useRef(0)
+  const frameRef = useRef(0)
+  useEffect(() => {
+    moveRef.current = onMove
+  })
+  useEffect(
+    () => () => {
+      if (frameRef.current) cancelAnimationFrame(frameRef.current)
+    },
+    []
+  )
+  const queueMove = (clientX: number) => {
+    pendingX.current = clientX
+    if (frameRef.current) return
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = 0
+      moveRef.current(pendingX.current)
+    })
+  }
+  const cancelMove = () => {
+    if (frameRef.current) cancelAnimationFrame(frameRef.current)
+    frameRef.current = 0
   }
 
   return (
@@ -148,8 +182,9 @@ export function CartesianRoot<TData extends Row>({
           ref={ref}
           className={cn("relative h-full w-full", className)}
           onPointerEnter={() => ctx.setMouseInChart(true)}
-          onPointerMove={interactive ? (e) => onMove(e.clientX) : undefined}
+          onPointerMove={interactive ? (e) => queueMove(e.clientX) : undefined}
           onPointerLeave={() => {
+            cancelMove()
             ctx.setMouseInChart(false)
             ctx.setHoverIndex(null)
             onHoverChange?.(null)

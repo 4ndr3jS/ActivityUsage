@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ActivityDevice, ActivityWatchRecord, ActivityWatchSnapshot } from "../../shared/desktop-api";
+import type { ActivityDevice, ActivityWatchBucket, ActivityWatchRecord, ActivityWatchSnapshot } from "../../shared/desktop-api";
 import { ChevronLeftIcon, ChevronRightIcon, RefreshIcon, ShareIcon } from "../icons";
 import { Area } from "./dither-kit/area";
 import { AreaChart } from "./dither-kit/area-chart";
@@ -274,8 +274,8 @@ function OverviewView({ days, hours, apps, periodLabel, rangeDays, summary, prev
       <DeviceMix summary={summary} />
     </div>
     <div className="activity-metric-grid">
-      <MetricCard title="Computer activity" value={formatDuration(summary.computer)} note="Recorded foreground-app intervals" delta={previous ? compareDelta(summary.computer, previous.computer) : null} spark={days.map(day => day.computer)} tone="green" />
-      <MetricCard title="Phone activity" value={formatDuration(summary.phone)} note="Recorded Android app intervals" delta={previous ? compareDelta(summary.phone, previous.phone) : null} spark={days.map(day => day.phone)} tone="purple" />
+      <MetricCard title="Computer activity" value={formatDuration(summary.computer)} note="Time recorded from desktop apps" delta={previous ? compareDelta(summary.computer, previous.computer) : null} spark={days.map(day => day.computer)} tone="green" />
+      <MetricCard title="Phone activity" value={formatDuration(summary.phone)} note="Time recorded from phone apps" delta={previous ? compareDelta(summary.phone, previous.phone) : null} spark={days.map(day => day.phone)} tone="purple" />
     </div>
     <div className="activity-metric-grid activity-metric-grid--compact">
       <MetricCard title="Daily average" value={formatDuration(days.length ? summary.combined / days.length : 0)} note="Across calendar days in range" />
@@ -285,7 +285,7 @@ function OverviewView({ days, hours, apps, periodLabel, rangeDays, summary, prev
     <SectionHeading eyebrow="Selected period" title={rangeDays === 1 ? "Usage through the day" : "Usage through the period"} detail={periodLabel} />
     <ChartPanel title={rangeDays === 1 ? "Hourly activity" : "Combined activity"} subtitle="Combined active time, with overlap counted once" rows={rangeDays === 1 ? hours : dailyRows(days, "combined")} tone="blue" kind={rangeDays === 1 ? "bar" : "area"} />
     <SectionHeading eyebrow="Applications" title="Where your time went" detail={periodLabel} />
-    <AppList apps={apps.slice(0, 8)} title="Most used apps" subtitle="Ranked by recorded foreground-app duration" />
+    <AppList apps={apps.slice(0, 8)} title="Most used apps" subtitle="Ranked by recorded app time" />
   </>;
 }
 
@@ -338,7 +338,7 @@ function DeviceMix({ summary }: { summary: Summary }): React.JSX.Element {
 }
 
 function BreakdownView({ apps, summary }: { apps: AppActivity[]; summary: Summary }): React.JSX.Element {
-  return <div className="activity-breakdown-grid"><DeviceMix summary={summary} /><AppList apps={apps} title="Applications" subtitle="Recorded foreground-app durations" /></div>;
+  return <div className="activity-breakdown-grid"><DeviceMix summary={summary} /><AppList apps={apps} title="Applications" subtitle="Recorded app time" /></div>;
 }
 
 function InsightsView({ days, hours, apps, summary }: { days: DayActivity[]; hours: Array<{ label: string; seconds: number }>; apps: AppActivity[]; summary: Summary }): React.JSX.Element {
@@ -358,16 +358,57 @@ function InsightsView({ days, hours, apps, summary }: { days: DayActivity[]; hou
   </>;
 }
 
+type SourceGroup = {
+  device: ActivityDevice;
+  buckets: ActivityWatchBucket[];
+  hostnames: string[];
+  eventCount: number;
+  lastUpdated: string | null;
+  errors: string[];
+};
+
+/** One card per device: every bucket a device reports collapses into it. */
+function groupSources(buckets: ActivityWatchBucket[]): SourceGroup[] {
+  return (["computer", "phone"] as const).flatMap(device => {
+    const matched = buckets.filter(bucket => bucket.device === device);
+    if (!matched.length) return [];
+    const times = matched.map(bucket => (bucket.lastUpdated ? Date.parse(bucket.lastUpdated) : NaN)).filter(time => Number.isFinite(time));
+    return [{
+      device,
+      buckets: matched,
+      hostnames: [...new Set(matched.map(bucket => bucket.hostname))],
+      eventCount: matched.reduce((sum, bucket) => sum + bucket.eventCount, 0),
+      lastUpdated: times.length ? new Date(Math.max(...times)).toISOString() : null,
+      errors: [...new Set(matched.map(bucket => bucket.error).filter((error): error is string => Boolean(error)))],
+    }];
+  });
+}
+
+function SourceRow({ label, values }: { label: string; values: string[] }): React.JSX.Element {
+  return <div><dt>{label}</dt><dd>{values.map(value => <span key={value}>{value}</span>)}</dd></div>;
+}
+
 function SourcesView({ snapshot, device }: { snapshot: ActivityWatchSnapshot | null; device: DeviceFilter }): React.JSX.Element {
   const buckets = snapshot?.buckets.filter(bucket => device === "all" || bucket.device === device) ?? [];
+  const groups = groupSources(buckets);
   return <>
-    <SectionHeading eyebrow="Local connections" title="Connected watchers" detail={`${buckets.length} sources in this view`} />
-    <div className="activity-source-grid">{buckets.map(bucket => <article className="activity-glass-card activity-source-card" key={bucket.id}>
-      <div className="activity-source-card__top"><span className={`activity-source-tag activity-source-tag--${bucket.device}`}><DeviceIcon phone={bucket.device === "phone"} />{bucket.device === "phone" ? "Phone watcher" : "Computer watcher"}</span><span className={`activity-source-state${bucket.error ? " is-warning" : bucket.eventCount ? "" : " is-idle"}`}><i />{bucket.error ? "Unavailable" : bucket.eventCount ? "Records available" : "No records in range"}</span></div>
-      <h3>{bucket.hostname}</h3><dl><div><dt>Bucket</dt><dd title={bucket.id}>{bucket.id}</dd></div><div><dt>Watcher type</dt><dd>{bucket.type}</dd></div><div><dt>Events in selected range</dt><dd>{bucket.eventCount.toLocaleString()}</dd></div><div><dt>Last updated</dt><dd>{bucket.lastUpdated ? new Date(bucket.lastUpdated).toLocaleString() : "Not provided by ActivityWatch"}</dd></div></dl>
-      {bucket.error && <p className="activity-source-error">{bucket.error}</p>}
-    </article>)}</div>
-    {snapshot && !buckets.length && <p className="activity-empty">No activity sources match the selected device.</p>}
+    <SectionHeading eyebrow="Local connections" title="Connected watchers" detail={`${groups.length} ${groups.length === 1 ? "device" : "devices"} reporting`} />
+    <div className="activity-source-grid">{groups.map(group => {
+      const warning = group.errors.length > 0;
+      const state = warning && !group.eventCount ? "Unavailable" : group.eventCount ? "Records available" : "No records in range";
+      return <article className="activity-glass-card activity-source-card" key={group.device}>
+        <div className="activity-source-card__top"><span className={`activity-source-tag activity-source-tag--${group.device}`}><DeviceIcon phone={group.device === "phone"} />{group.device === "phone" ? "Phone watcher" : "Computer watcher"}</span><span className={`activity-source-state${warning ? " is-warning" : group.eventCount ? "" : " is-idle"}`}><i />{state}</span></div>
+        <h3>{group.hostnames.join(" · ")}</h3>
+        <dl>
+          <SourceRow label={group.buckets.length === 1 ? "Bucket" : "Buckets"} values={group.buckets.map(bucket => bucket.id)} />
+          <SourceRow label={group.buckets.length === 1 ? "Watcher type" : "Watcher types"} values={[...new Set(group.buckets.map(bucket => bucket.type))]} />
+          <div><dt>Events in selected range</dt><dd>{group.eventCount.toLocaleString()}</dd></div>
+          <div><dt>Last updated</dt><dd>{group.lastUpdated ? new Date(group.lastUpdated).toLocaleString() : "Not provided by ActivityWatch"}</dd></div>
+        </dl>
+        {group.errors.map(error => <p className="activity-source-error" key={error}>{error}</p>)}
+      </article>;
+    })}</div>
+    {snapshot && !groups.length && <p className="activity-empty">No activity sources match the selected device.</p>}
     {!snapshot && <p className="activity-empty">Start ActivityWatch on this computer, then refresh to read its sources.</p>}
   </>;
 }

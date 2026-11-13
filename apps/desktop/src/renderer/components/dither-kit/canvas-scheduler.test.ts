@@ -68,6 +68,19 @@ describe("canvas scheduling", () => {
     scheduler.dispose();
   });
 
+  it("redraws only the overlay when the fill is unchanged", () => {
+    const draw = vi.fn().mockReturnValue(false);
+    const scheduler = scheduleCanvas({} as HTMLCanvasElement, draw);
+    intersect(true);
+    tick();
+    scheduler.invalidate(false);
+    tick();
+    scheduler.invalidate(true);
+    tick();
+    expect(draw.mock.calls.map(call => call[1])).toEqual([true, false, true]);
+    scheduler.dispose();
+  });
+
   it("pauses offscreen and while hidden, resumes with current data, and cancels on disposal", () => {
     const draw = vi.fn().mockReturnValue(true);
     const scheduler = scheduleCanvas({} as HTMLCanvasElement, draw);

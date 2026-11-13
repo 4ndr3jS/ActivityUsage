@@ -111,11 +111,14 @@ function startCartesianLoop({
   let needsFill = true
   let lastPaintSig = ""
   let lastSelected: string | null | undefined = Symbol() as never
+  // The crosshair moves on almost every pointer event; tracking it separately
+  // from the fill is what lets a hover redraw skip the dither repaint.
+  let lastMarker: number | null | undefined = Symbol() as never
 
-  const draw = (now: number, dirty: boolean) => {
+  const draw = (now: number, full: boolean) => {
     const s = state.current
     if (!s.ready) return
-    if (dirty) needsFill = true
+    if (full) needsFill = true
     const tgt = targets.current
     if (s.revision !== lastRevision) {
       lastRevision = s.revision
@@ -168,17 +171,20 @@ function startCartesianLoop({
       needsFill = true
     }
 
+    // Snap straight to the target instead of easing: each step of an eased
+    // lift repaints every dither column, which is what made hovering janky.
     const itTarget = s.isMouseInChart || s.hovered ? 1 : 0
-    let settling = false
-    if (Math.abs(intensity - itTarget) > 0.001) {
-      intensity += (itTarget - intensity) * 0.16
-      settling = true
+    const settling = intensity !== itTarget
+    if (settling) {
+      intensity = itTarget
       needsFill = true
-    } else intensity = itTarget
+    }
 
     // Live hover wins; the controlled markerIndex (e.g. a committed point)
     // is the fallback shown when nothing is hovered.
     const marker = s.hoverIndex != null ? s.hoverIndex : s.markerIndex
+    const markerChanged = marker !== lastMarker
+    if (markerChanged) lastMarker = marker
     // Repaint when a tweak-driven paint input changes (variant, stacking) so
     // the panel updates the fill live — without resetting the entrance reveal.
     const paintSig = `${s.stackType}|${s.configKeys
@@ -195,7 +201,8 @@ function startCartesianLoop({
         settling ||
         needsFill ||
         progChanged ||
-        sigChanged
+        sigChanged ||
+        markerChanged
       )
     )
       return
@@ -340,11 +347,18 @@ export function CartesianCanvas() {
   const targetsRef = useRef(targets)
   const starsRef = useRef(stars)
   const schedulerRef = useRef<CanvasScheduler | undefined>(undefined)
+  // Geometry identity tells us whether the painted surface changed. Hover and
+  // cursor ticks re-render this component too, and those must not force a dither
+  // repaint — they only move the overlay.
+  const fillInputsRef = useRef({ targets, stars })
   useEffect(() => {
     stateRef.current = ctx
     targetsRef.current = targets
     starsRef.current = stars
-    schedulerRef.current?.invalidate()
+    const prev = fillInputsRef.current
+    const full = prev.targets !== targets || prev.stars !== stars
+    fillInputsRef.current = { targets, stars }
+    schedulerRef.current?.invalidate(full)
   })
 
   useEffect(() => {
