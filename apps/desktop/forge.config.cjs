@@ -99,9 +99,15 @@ module.exports = {
   rebuildConfig: {},
   makers: [
     new MakerSquirrel({
-      name: "Activity Usage",
+      // Squirrel derives the install directory and the AppUserModelID from
+      // `name`, so it must stay space-free and match `com.squirrel.ActivityUsage`
+      // in main.ts — otherwise Windows treats the pinned app and the installed
+      // app as two different programs. `title` is the human-readable label.
+      name: "ActivityUsage",
+      title: "Activity Usage",
+      exe: "ActivityUsage.exe",
       authors: "Activity Usage contributors",
-      description: "Cross-platform AI provider usage dashboard",
+      description: "Computer and Android activity analytics with ActivityWatch",
       setupIcon: path.join(iconDirectory, "activityusage.ico"),
       iconUrl: "https://usageatlas.com/icon.ico",
       windowsSign
@@ -130,7 +136,7 @@ module.exports = {
       options: {
         name: "activityusage",
         bin: "ActivityUsage",
-        genericName: "AI usage dashboard",
+        genericName: "Device activity analytics",
         categories: ["Utility", "Development"],
         homepage: "https://usageatlas.com",
         license: "MIT",
@@ -141,7 +147,7 @@ module.exports = {
       options: {
         name: "activityusage",
         bin: "ActivityUsage",
-        genericName: "AI usage dashboard",
+        genericName: "Device activity analytics",
         categories: ["Utility", "Development"],
         maintainer: "Activity Usage contributors",
         homepage: "https://usageatlas.com",
