@@ -74,7 +74,7 @@ function startCartesianLoop({
   const animate = state.current.animate && !reduce
   const duration = state.current.animationDuration
   // Hover fade length. Reduced motion jumps straight to the target.
-  const FADE = reduce ? 0 : 170
+  const FADE = reduce ? 0 : 340
   const current: Record<string, Surface> = {}
 
   // `reveal` (0–1) sweeps the fill in left-to-right on first paint.
