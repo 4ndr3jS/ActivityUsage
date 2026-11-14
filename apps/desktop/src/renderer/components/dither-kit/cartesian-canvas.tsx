@@ -47,11 +47,20 @@ function startCartesianLoop({
   canvas.width = cols
   canvas.height = rows
 
-  const off = document.createElement("canvas")
-  off.width = cols
-  off.height = rows
-  const octx = off.getContext("2d")
-  if (!octx) return undefined
+  // Two cached fill layers: `0` is the resting weight, `1` the hover lift.
+  // Painting both lets the hover fade be a two-image blend per frame instead of
+  // a full dither repaint, which is what made the eased lift janky before.
+  const liftCanvas: HTMLCanvasElement[] = []
+  const liftCtx: CanvasRenderingContext2D[] = []
+  for (let i = 0; i < 2; i++) {
+    const cv = document.createElement("canvas")
+    cv.width = cols
+    cv.height = rows
+    const cx = cv.getContext("2d")
+    if (!cx) return undefined
+    liftCanvas.push(cv)
+    liftCtx.push(cx)
+  }
 
   // Bloom layer: a blurred, additive copy of the crisp canvas.
   const bloomCtx = bloomCanvas?.getContext("2d") ?? null
@@ -64,10 +73,14 @@ function startCartesianLoop({
   const EASE = reduce ? 1 : 0.18
   const animate = state.current.animate && !reduce
   const duration = state.current.animationDuration
+  // Hover fade length. Reduced motion jumps straight to the target.
+  const FADE = reduce ? 0 : 170
   const current: Record<string, Surface> = {}
 
   // `reveal` (0–1) sweeps the fill in left-to-right on first paint.
-  const paintFill = (intensity: number, reveal: number) => {
+  const paintFill = (layer: number, reveal: number) => {
+    const octx = liftCtx[layer]
+    const weight = layer
     octx.clearRect(0, 0, cols, rows)
     const s = state.current
     const stacked = s.stackType === "stacked" || s.stackType === "percent"
@@ -94,7 +107,7 @@ function startCartesianLoop({
         const b = cur.floor[x] ?? 0
         paintColumn(octx, x, Math.min(a, b), Math.max(a, b), seed, {
           variant,
-          intensity,
+          intensity: weight,
           dim,
           stacked: stacked && !isLine,
           sparse,
@@ -107,7 +120,16 @@ function startCartesianLoop({
   let lastProg = -1
   let lastRevision = state.current.revision
   let entranceReported = !animate
+  // Hover lift, faded between the two cached fill layers.
   let intensity = 0
+  let liftTarget = 0
+  let liftFrom = 0
+  let liftStart = 0
+  // Last blended value actually composited, so a change in lift always repaints
+  // even when the fade is instant (reduced motion).
+  let drawnIntensity = -1
+  // Whether each cached layer matches the current surfaces / reveal / emphasis.
+  const layerDirty = [true, true]
   let needsFill = true
   let lastPaintSig = ""
   let lastSelected: string | null | undefined = Symbol() as never
@@ -171,14 +193,19 @@ function startCartesianLoop({
       needsFill = true
     }
 
-    // Snap straight to the target instead of easing: each step of an eased
-    // lift repaints every dither column, which is what made hovering janky.
+    // Fade the lift toward its target instead of snapping. Both brightness
+    // layers are cached, so a fade frame only re-blends two images — a full
+    // dither repaint happens once per layer, not once per frame.
     const itTarget = s.isMouseInChart || s.hovered ? 1 : 0
-    const settling = intensity !== itTarget
-    if (settling) {
-      intensity = itTarget
-      needsFill = true
+    if (itTarget !== liftTarget) {
+      liftFrom = intensity
+      liftTarget = itTarget
+      liftStart = now
     }
+    const fade = FADE === 0 ? 1 : Math.min(1, (now - liftStart) / FADE)
+    const settling = fade < 1
+    intensity = liftFrom + (liftTarget - liftFrom) * easeInOutCubic(fade)
+    const liftChanged = intensity !== drawnIntensity
 
     // Live hover wins; the controlled markerIndex (e.g. a committed point)
     // is the fallback shown when nothing is hovered.
@@ -199,6 +226,7 @@ function startCartesianLoop({
       !(
         moving ||
         settling ||
+        liftChanged ||
         needsFill ||
         progChanged ||
         sigChanged ||
@@ -217,11 +245,36 @@ function startCartesianLoop({
     const revealCols = reveal * cols
 
     if (needsFill) {
-      paintFill(intensity, reveal)
+      layerDirty[0] = true
+      layerDirty[1] = true
       needsFill = false
     }
+    // Paint only the layers the current blend needs, and only when stale.
+    const needBoth = intensity > 0 && intensity < 1
+    for (let layer = 0; layer < 2; layer++) {
+      if (!layerDirty[layer]) continue
+      if (!needBoth && layer !== (intensity >= 1 ? 1 : 0)) continue
+      paintFill(layer, reveal)
+      layerDirty[layer] = false
+    }
     c.clearRect(0, 0, cols, rows)
-    c.drawImage(off, 0, 0)
+    if (intensity <= 0) {
+      c.drawImage(liftCanvas[0], 0, 0)
+    } else if (intensity >= 1) {
+      c.drawImage(liftCanvas[1], 0, 0)
+    } else {
+      // Additive cross-blend: both layers share the same colour per series, so
+      // summing the premultiplied pixels gives an exact linear mix of the two
+      // weights (a plain source-over blend would dim the middle of the fade).
+      c.globalCompositeOperation = "lighter"
+      c.globalAlpha = 1 - intensity
+      c.drawImage(liftCanvas[0], 0, 0)
+      c.globalAlpha = intensity
+      c.drawImage(liftCanvas[1], 0, 0)
+      c.globalAlpha = 1
+      c.globalCompositeOperation = "source-over"
+    }
+    drawnIntensity = intensity
 
     const mx =
       marker != null && s.dataLength > 1
