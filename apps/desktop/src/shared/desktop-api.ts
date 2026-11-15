@@ -8,6 +8,7 @@ export type EngineStatus = "starting" | "ready" | "degraded" | "stopped";
 export interface ActivityWatchRange {
   start: string;
   end: string;
+  includeBrowserTabs?: boolean;
 }
 
 export type ActivityDevice = "computer" | "phone";
@@ -31,11 +32,22 @@ export interface ActivityWatchBucket {
   error: string | null;
 }
 
+export interface ActivityWatchTab {
+  timestamp: string;
+  duration: number;
+  bucketId: string;
+  browser: string | null;
+  site: string;
+  page: string;
+  title: string | null;
+}
+
 export interface ActivityWatchSnapshot {
   connected: true;
   fetchedAt: string;
   buckets: ActivityWatchBucket[];
   events: ActivityWatchRecord[];
+  tabs: ActivityWatchTab[];
 }
 
 export interface DesktopUpdateState {

@@ -15,7 +15,7 @@ Activity Usage reads local ActivityWatch records and turns them into a desktop d
 
 - Today and historical activity across your computer and phone
 - Computer, phone, and combined active-time charts
-- App breakdowns, observed patterns, and source health
+- App breakdowns, websites and pages recorded by ActivityWatch’s browser watcher, observed patterns, and source health
 - Date ranges, prior-period comparison, and JSON export
 - Privacy controls for window titles and exported app labels
 
@@ -29,7 +29,7 @@ Totals are calculated from the intervals ActivityWatch records. Combined time co
 
 ## Privacy
 
-Activity records are read locally and are not uploaded. Window titles are hidden by default. Exported summaries omit app labels unless you enable them.
+Activity records are read locally and are not uploaded. Window titles are hidden by default. Select **Pages** in Activity Breakdown to see recorded browser tab titles and addresses with query strings and fragments removed. Exported summaries omit app labels unless you enable them and do not include visited pages.
 
 ## Build
 

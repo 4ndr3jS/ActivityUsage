@@ -25,11 +25,16 @@ export type PieChartProps<TData extends Row> = {
   replayToken?: number
   bloom?: BloomInput
   bloomOnHover?: boolean
+  expandOnHover?: boolean
   defaultSelectedDataKey?: string | null
   onSelectionChange?: (key: string | null) => void
 }
 
 /** Composable dither **pie / donut** chart. Compose `<Pie>`, `<Legend>`, … inside. */
-export function PieChart<TData extends Row>(props: PieChartProps<TData>) {
-  return <PolarRoot chartType="pie" Canvas={PieCanvas} {...props} />
+export function PieChart<TData extends Row>({ expandOnHover = true, ...props }: PieChartProps<TData>) {
+  return <PolarRoot chartType="pie" Canvas={expandOnHover ? PieCanvas : FixedPieCanvas} {...props} />
+}
+
+function FixedPieCanvas() {
+  return <PieCanvas expandOnHover={false} />
 }

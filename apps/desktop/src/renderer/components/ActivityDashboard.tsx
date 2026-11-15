@@ -14,7 +14,9 @@ import { XAxis } from "./dither-kit/x-axis";
 import { YAxis } from "./dither-kit/y-axis";
 import type { DitherColor } from "./dither-kit/palette";
 import { createActivityPeriod } from "../activity-period";
+import { subscribeActivityRefresh } from "../activity-refresh";
 import { appLabel } from "../app-label";
+import { buildBrowserActivity, type BrowserActivity } from "../browser-activity";
 import "./activity-dashboard.css";
 
 type RangeDays = 1 | 7 | 30 | 90 | 365;
@@ -55,7 +57,9 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   const [compare, setCompare] = useState(false);
   const [showTitles, setShowTitles] = useState(() => readPreference("activityusage.activity.showTitles"));
   const [includeLabels, setIncludeLabels] = useState(() => readPreference("activityusage.activity.includeLabels"));
-  const [autoRefresh, setAutoRefresh] = useState(() => readPreference("activityusage.activity.autoRefresh"));
+  const [autoRefresh, setAutoRefresh] = useState(() => readPreference("activityusage.activity.autoRefresh", true));
+  const [calendarDay, setCalendarDay] = useState(() => localDateKey(new Date()));
+  const autoRequestRunning = useRef(false);
   const [snapshot, setSnapshot] = useState<ActivityWatchSnapshot | null>(null);
   const [previousSnapshot, setPreviousSnapshot] = useState<ActivityWatchSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
@@ -79,15 +83,18 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
     previousView.current = view;
   }, [view]);
 
-  const period = useMemo(() => createActivityPeriod(rangeDays, periodOffset), [periodOffset, rangeDays]);
-  const loadData = useCallback(async (): Promise<void> => {
+  const period = useMemo(() => createActivityPeriod(rangeDays, periodOffset, new Date(calendarDay + "T12:00:00")), [periodOffset, rangeDays, calendarDay]);
+  const includeBrowserTabs = view === "breakdown";
+  const loadData = useCallback(async (silent = false): Promise<void> => {
     const request = ++requestVersion.current;
     setLoading(true);
     setError(null);
-    setSnapshot(null);
-    setPreviousSnapshot(null);
+    if (!silent) {
+      setSnapshot(null);
+      setPreviousSnapshot(null);
+    }
     try {
-      const currentRange = { start: period.start.toISOString(), end: period.end.toISOString() };
+      const currentRange = { start: period.start.toISOString(), end: period.end.toISOString(), includeBrowserTabs };
       const previousRange = {
         start: new Date(new Date(period.start).setDate(period.start.getDate() - rangeDays)).toISOString(),
         end: period.start.toISOString()
@@ -103,7 +110,7 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
     } finally {
       if (request === requestVersion.current) setLoading(false);
     }
-  }, [compare, period, rangeDays]);
+  }, [compare, includeBrowserTabs, period, rangeDays]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => { void loadData(); }, 0);
@@ -111,11 +118,14 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   }, [loadData]);
   useEffect(() => {
     if (!autoRefresh) return undefined;
-    const timer = window.setInterval(() => {
-      if (!document.hidden) void loadData();
-    }, 5 * 60 * 1000);
-    return () => window.clearInterval(timer);
-  }, [autoRefresh, loadData]);
+    return subscribeActivityRefresh(() => {
+      const today = localDateKey(new Date());
+      if (today !== calendarDay) { setCalendarDay(today); return; }
+      if (autoRequestRunning.current) return;
+      autoRequestRunning.current = true;
+      void loadData(true).finally(() => { autoRequestRunning.current = false; });
+    });
+  }, [autoRefresh, calendarDay, loadData]);
 
   const events = snapshot?.events ?? EMPTY_EVENTS;
   const visibleEvents = useMemo(() => filterEvents(events, device), [device, events]);
@@ -135,7 +145,10 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   const needsApps = view === "overview" || view === "breakdown" || view === "insights";
   const hours = useMemo(() => needsHours ? buildHours(events, period.start, device) : [], [device, events, period.start, needsHours]);
   const hourProfile = useMemo(() => needsHourProfile ? buildHourProfile(events, device) : [], [device, events, needsHourProfile]);
-  const apps = useMemo(() => needsApps ? buildApps(visibleEvents, showTitles) : [], [showTitles, visibleEvents, needsApps]);
+  const apps = useMemo(() => needsApps ? buildApps(visibleEvents, showTitles && !includeBrowserTabs) : [], [showTitles, visibleEvents, needsApps, includeBrowserTabs]);
+  const browsers = useMemo(() => includeBrowserTabs && snapshot
+    ? buildBrowserActivity(visibleEvents, snapshot.tabs, snapshot.buckets)
+    : new Map<string, BrowserActivity>(), [includeBrowserTabs, snapshot, visibleEvents]);
   const peakDay = visibleDays.reduce<DayActivity | null>((peak, day) => !peak || day.combined > peak.combined ? day : peak, null);
   const periodLabel = labelPeriod(period, rangeDays);
   const pageTitle: Record<ActivityView, string> = {
@@ -228,7 +241,7 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
         <>
           {view === "overview" && <OverviewView days={visibleDays} hours={hours} apps={apps} periodLabel={periodLabel} rangeDays={rangeDays} summary={summary} previous={compare ? previousSummary : null} peakDay={peakDay} />}
           {view === "history" && <HistoryView days={visibleDays} periodLabel={periodLabel} summary={summary} previous={compare ? previousSummary : null} />}
-          {view === "breakdown" && <BreakdownView apps={apps} summary={summary} />}
+          {view === "breakdown" && <BreakdownView apps={apps} browsers={browsers} />}
           {view === "insights" && <InsightsView days={visibleDays} hours={hourProfile} apps={apps} summary={summary} />}
           <footer className="activity-dashboard__footer">
             <span>{visibleEvents.length.toLocaleString()} recorded events · {periodLabel}</span>
@@ -322,7 +335,7 @@ function DeviceMix({ summary }: { summary: Summary }): React.JSX.Element {
     <div className="activity-chart-panel__header"><div><h3>Device mix</h3><p>Share of tracked time across your devices</p></div></div>
     <div className="activity-device-mix">
       <div className={`activity-donut${total ? "" : " is-empty"}`} role="img" aria-label={total ? `Tracked time ${formatDuration(total)}. Computer ${Math.round(summary.computer / total * 100)}%, phone ${Math.round(summary.phone / total * 100)}%.` : "No device activity recorded"}>
-        {total > 0 && <PieChart config={config} data={data.filter(row => row.value > 0)} dataKey="value" nameKey="name" innerRadius={0.68} margins={{ top: 8, right: 8, bottom: 8, left: 8 }} bloom="low" animate={false}>
+        {total > 0 && <PieChart config={config} data={data.filter(row => row.value > 0)} dataKey="value" nameKey="name" innerRadius={0.68} margins={{ top: 8, right: 8, bottom: 8, left: 8 }} bloom="low" animate={false} expandOnHover={false}>
           <Pie variant="gradient" /><Tooltip valueFormatter={formatDuration} variant="frosted-glass" />
         </PieChart>}
         <div className="activity-donut-center"><strong>{formatDuration(total)}</strong><span>tracked time</span></div>
@@ -337,8 +350,51 @@ function DeviceMix({ summary }: { summary: Summary }): React.JSX.Element {
   </section>;
 }
 
-function BreakdownView({ apps, summary }: { apps: AppActivity[]; summary: Summary }): React.JSX.Element {
-  return <div className="activity-breakdown-grid"><DeviceMix summary={summary} /><AppList apps={apps} title="Applications" subtitle="Recorded app time" /></div>;
+function BreakdownView({ apps, browsers }: { apps: AppActivity[]; browsers: ReadonlyMap<string, BrowserActivity> }): React.JSX.Element {
+  const [selection, setSelection] = useState<string>();
+  const selected = selection && browsers.has(selection) ? selection
+    : apps.find(app => browsers.has(app.label))?.label;
+  const activity = selected ? browsers.get(selected) : undefined;
+  return <div className="activity-breakdown-grid">
+    <AppList apps={apps} title="Applications" subtitle="Recorded app time. Select a browser for more detail."
+      browserSelection={{ selected, browsers, select: setSelection }} />
+    {selected && activity
+      ? <BrowserActivityPanel key={selected} browser={selected} activity={activity} />
+      : <section className="activity-glass-card activity-browser-panel">
+        <div className="activity-chart-panel__header"><div><h3>Browser activity</h3><p>No browser use recorded for this device and date range.</p></div></div>
+      </section>}
+  </div>;
+}
+
+function BrowserActivityPanel({ browser, activity }: { browser: string; activity: BrowserActivity }): React.JSX.Element {
+  const [mode, setMode] = useState<"sites" | "pages">("sites");
+  const [limit, setLimit] = useState(15);
+  const rows = activity[mode];
+  const recorded = activity.sites.reduce((sum, row) => sum + row.seconds, 0);
+  const duration = (seconds: number): string => seconds > 0 && seconds < 60 ? "<1m" : formatDuration(seconds);
+  return <section className="activity-glass-card activity-browser-panel" aria-label={`${browser} browser activity`}>
+    <div className="activity-chart-panel__header">
+      <div><h3>{browser} activity</h3><p>Time matched to an active tab by ActivityWatch</p></div>
+      <strong>{duration(recorded)}</strong>
+    </div>
+    <div className="activity-browser-modes" role="group" aria-label="Group browser activity">
+      {(["sites", "pages"] as const).map(value => <button type="button" key={value} aria-pressed={mode === value}
+        onClick={() => { setMode(value); setLimit(15); }}>{value === "sites" ? "Websites" : "Pages"}</button>)}
+    </div>
+    {rows.length ? <ol className="activity-browser-list">
+      {rows.slice(0, limit).map(row => <li key={JSON.stringify([row.label, row.address])}>
+        <div className="activity-app-row"><span title={row.label}>{row.label}</span><b>{duration(row.seconds)}</b></div>
+        {row.address && <small title={row.address}>{row.address}</small>}
+        <div className="activity-app-track" aria-hidden="true"><i style={{ width: `${row.seconds / rows[0].seconds * 100}%` }} /></div>
+      </li>)}
+    </ol> : <p className="activity-explainer">No matching tab records for this browser in the selected period. ActivityWatch’s browser watcher supplies website and page details.</p>}
+    {rows.length > limit && <button type="button" className="activity-button activity-browser-more" onClick={() => setLimit(value => value + 15)}>
+      Show more {mode === "sites" ? "websites" : "pages"}
+    </button>}
+    {activity.unassignedSeconds >= 0.001 && <div className="activity-browser-unassigned">
+      <span>Browser time without a matched tab</span><b>{duration(activity.unassignedSeconds)}</b>
+    </div>}
+  </section>;
 }
 
 function InsightsView({ days, hours, apps, summary }: { days: DayActivity[]; hours: Array<{ label: string; seconds: number }>; apps: AppActivity[]; summary: Summary }): React.JSX.Element {
@@ -430,7 +486,7 @@ function ActivitySettingsView({ showTitles, includeLabels, autoRefresh, onShowTi
     <section className="activity-glass-card activity-privacy-card"><p className="activity-eyebrow">PRIVACY</p><h2>Local activity controls</h2>
       <PreferenceToggle checked={showTitles} label="Show window titles" note="Window titles may reveal document or page names." onChange={onShowTitles} />
       <PreferenceToggle checked={includeLabels} label="Include app labels in exports" note="Off by default; exports contain totals and daily activity only." onChange={onIncludeLabels} />
-      <PreferenceToggle checked={autoRefresh} label="Refresh every five minutes" note="Reads the local ActivityWatch API while this page is open." onChange={onAutoRefresh} />
+      <PreferenceToggle checked={autoRefresh} label="Refresh automatically" note="Updates every minute and when you return to the app. Days start at midnight." onChange={onAutoRefresh} />
       <p className="activity-privacy-note">ActivityWatch data stays in its local database. Activity Usage does not upload device activity.</p>
     </section>
     <section className="activity-glass-card activity-privacy-card"><p className="activity-eyebrow">DISPLAY</p><h2>Reporting time zone</h2>
@@ -465,10 +521,26 @@ function ChartPanel({ title, subtitle, rows, tone, kind = "area" }: {
   </section>;
 }
 
-function AppList({ apps, title, subtitle }: { apps: AppActivity[]; title: string; subtitle: string }): React.JSX.Element {
-  const maximum = Math.max(1, ...apps.map(app => app.seconds));
+function AppList({ apps, title, subtitle, browserSelection }: {
+  apps: AppActivity[]; title: string; subtitle: string;
+  browserSelection?: { selected?: string; browsers: ReadonlyMap<string, BrowserActivity>; select(label: string): void };
+}): React.JSX.Element {
+  const maximum = Math.max(1, apps[0]?.seconds ?? 0);
   return <section className="activity-glass-card activity-app-list"><div className="activity-chart-panel__header"><div><h3>{title}</h3><p>{subtitle}</p></div></div>
-    {apps.length ? <ol>{apps.map((app, index) => <li key={app.label}><span className="activity-app-rank">{String(index + 1).padStart(2, "0")}</span><div className="activity-app-detail"><div className="activity-app-row"><span title={app.label}>{app.label}</span><b>{formatDuration(app.seconds)}</b></div><div className="activity-app-track"><i style={{ width: `${app.seconds / maximum * 100}%` }} /></div><small>{app.events.toLocaleString()} recorded events</small></div></li>)}</ol> : <p className="activity-empty">No app-level events in this range.</p>}
+    {apps.length ? <ol>{apps.map((app, index) => {
+      const selectable = browserSelection?.browsers.has(app.label);
+      const label = <><span title={app.label}>{app.label}{selectable && <ChevronRightIcon />}</span><b>{formatDuration(app.seconds)}</b></>;
+      return <li key={app.label}>
+        <span className="activity-app-rank">{String(index + 1).padStart(2, "0")}</span>
+        <div className="activity-app-detail">
+          {selectable ? <button type="button" className="activity-app-row activity-browser-select"
+            aria-pressed={browserSelection?.selected === app.label} onClick={() => browserSelection?.select(app.label)}>{label}</button>
+            : <div className="activity-app-row">{label}</div>}
+          <div className="activity-app-track"><i style={{ width: `${app.seconds / maximum * 100}%` }} /></div>
+          <small>{app.events.toLocaleString()} recorded events</small>
+        </div>
+      </li>;
+    })}</ol> : <p className="activity-empty">No app-level events in this range.</p>}
   </section>;
 }
 
@@ -639,8 +711,8 @@ function formatDuration(seconds: number): string {
   return hours ? `${hours}h ${remainder}m` : `${remainder}m`;
 }
 
-function readPreference(key: string): boolean {
-  try { return window.localStorage.getItem(key) === "1"; } catch { return false; }
+function readPreference(key: string, fallback = false): boolean {
+  try { const value = window.localStorage.getItem(key); return value === null ? fallback : value === "1"; } catch { return fallback; }
 }
 
 function localDateKey(date: Date): string {

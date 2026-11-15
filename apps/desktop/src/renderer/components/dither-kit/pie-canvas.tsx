@@ -23,7 +23,7 @@ const POP = 6
  * plot space, tested for its slice by angle, and filled with the ordered-dither
  * scatter. The pie sweeps in clockwise on mount and hovered slices bulge out.
  */
-export function PieCanvas() {
+export function PieCanvas({ expandOnHover = true }: { expandOnHover?: boolean }) {
   const ctx = usePolarChart()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const bloomRef = useRef<HTMLCanvasElement>(null)
@@ -92,7 +92,8 @@ export function PieCanvas() {
           if (sliceIndex < 0) continue
           const slice = slices[sliceIndex]
           const active = s.hoverIndex === sliceIndex
-          const localOuter = active ? outerR + POP * popEase : outerR
+          const expansion = active && expandOnHover ? popEase : 0
+          const localOuter = outerR + POP * expansion
           if (r > localOuter) continue
 
           const seed = s.seedOf(slice.name)
@@ -102,7 +103,7 @@ export function PieCanvas() {
             emphasis !== null && emphasis !== slice.name ? 0.3 : 1
           const activeIntensity = intensity + (active ? 0.4 * popEase : 0)
 
-          if (localOuter - r < 1.4 + (active ? popEase : 0)) {
+          if (localOuter - r < 1.4 + expansion) {
             c.fillStyle = rgb(seed.fill, 1, selectionDim)
             c.fillRect(x, y, 1, 1)
             continue
@@ -186,7 +187,7 @@ export function PieCanvas() {
     const scheduler = scheduleCanvas(canvas, draw)
     schedulerRef.current = scheduler
     return () => { scheduler.dispose(); schedulerRef.current = undefined }
-  }, [cols, rows, width, height])
+  }, [cols, rows, width, height, expandOnHover])
 
   const bloom = bloomLayerStyle(
     ctx.bloom,

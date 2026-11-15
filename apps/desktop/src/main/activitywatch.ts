@@ -3,8 +3,10 @@ import type {
   ActivityWatchBucket,
   ActivityWatchRange,
   ActivityWatchRecord,
-  ActivityWatchSnapshot
+  ActivityWatchSnapshot,
+  ActivityWatchTab
 } from "../shared/desktop-api";
+import { pageAddress } from "../shared/browser-page";
 
 const ACTIVITYWATCH_API = "http://127.0.0.1:5600/api/0";
 const MAX_RANGE_MS = 366 * 24 * 60 * 60 * 1000;
@@ -25,6 +27,7 @@ interface RawEvent extends Record<string, unknown> {
 interface BucketReadResult {
   bucket: ActivityWatchBucket;
   events: ActivityWatchRecord[];
+  tabs: ActivityWatchTab[];
 }
 
 /** Read the local ActivityWatch API without exposing its HTTP surface to the renderer. */
@@ -38,14 +41,15 @@ export async function readActivityWatchData(value: unknown): Promise<ActivityWat
       ? Object.values(bucketPayload)
       : [];
   const buckets = rawBuckets.filter(isRecord).map(bucket => bucket as RawBucket).filter(bucket => typeof bucket.id === "string");
-  const sources = buckets.filter(isTrackedBucket);
-  const results = await Promise.all(sources.map(bucket => readBucket(bucket, start, end)));
+  const sources = buckets.filter(bucket => isTrackedBucket(bucket) || (range.includeBrowserTabs && isTabBucket(bucket)));
+  const results = await Promise.all(sources.map(bucket => readBucket(bucket, start, end, range.includeBrowserTabs === true)));
 
   return {
     connected: true,
     fetchedAt: new Date().toISOString(),
     buckets: results.map(result => result.bucket),
-    events: results.flatMap(result => result.events).sort((left, right) => Date.parse(left.timestamp) - Date.parse(right.timestamp))
+    events: results.flatMap(result => result.events).sort((left, right) => Date.parse(left.timestamp) - Date.parse(right.timestamp)),
+    tabs: results.flatMap(result => result.tabs)
   };
 }
 
@@ -58,7 +62,7 @@ function validateRange(value: unknown): ActivityWatchRange {
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start || end - start > MAX_RANGE_MS) {
     throw new Error("The ActivityWatch date range is invalid or too large.");
   }
-  return { start: new Date(start).toISOString(), end: new Date(end).toISOString() };
+  return { start: new Date(start).toISOString(), end: new Date(end).toISOString(), includeBrowserTabs: value.includeBrowserTabs === true };
 }
 
 async function requestJson(url: string): Promise<unknown> {
@@ -76,7 +80,11 @@ function isTrackedBucket(bucket: RawBucket): boolean {
   return /currentwindow|aw-watcher-android|android/i.test(`${id} ${type}`);
 }
 
-async function readBucket(bucket: RawBucket, start: number, end: number): Promise<BucketReadResult> {
+function isTabBucket(bucket: RawBucket): boolean {
+  return bucket.type === "web.tab.current";
+}
+
+async function readBucket(bucket: RawBucket, start: number, end: number, includeBrowserTabs: boolean): Promise<BucketReadResult> {
   const id = asString(bucket.id) ?? "";
   const device = bucketDevice(bucket);
   const type = asString(bucket.type) ?? "Unknown watcher";
@@ -87,11 +95,28 @@ async function readBucket(bucket: RawBucket, start: number, end: number): Promis
 
   try {
     const payload = await requestJson(`${ACTIVITYWATCH_API}/buckets/${encodeURIComponent(id)}/events?${query.toString()}`);
-    if (!Array.isArray(payload)) return { bucket: { ...base, error: "ActivityWatch returned an unexpected event format." }, events: [] };
-    const events = payload.filter(isRecord).map(row => normalizeEvent(row as RawEvent, id, device, start, end)).filter((record): record is ActivityWatchRecord => record !== null);
-    return { bucket: { ...base, eventCount: events.length }, events };
+    if (!Array.isArray(payload)) return { bucket: { ...base, error: "ActivityWatch returned an unexpected event format." }, events: [], tabs: [] };
+    const events: ActivityWatchRecord[] = [];
+    const tabs: ActivityWatchTab[] = [];
+    const keepEvents = isTrackedBucket(bucket);
+    const keepTabs = includeBrowserTabs && isTabBucket(bucket);
+    for (const row of payload) {
+      if (!isRecord(row)) continue;
+      const record = normalizeEvent(row, id, device, start, end);
+      if (!record) continue;
+      if (keepEvents) events.push(record);
+      if (keepTabs) {
+        const data = isRecord(row.data) ? row.data : {};
+        const address = pageAddress(asString(data.url));
+        if (address) tabs.push({
+          ...address, timestamp: record.timestamp, duration: record.duration, bucketId: id,
+          browser: firstString(data.browser), title: record.title
+        });
+      }
+    }
+    return { bucket: { ...base, eventCount: keepTabs ? tabs.length : events.length }, events, tabs };
   } catch {
-    return { bucket: { ...base, error: "Could not read events from this watcher." }, events: [] };
+    return { bucket: { ...base, error: "Could not read events from this watcher." }, events: [], tabs: [] };
   }
 }
 
