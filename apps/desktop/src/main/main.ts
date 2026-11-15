@@ -16,7 +16,7 @@ import squirrelStartup from "electron-squirrel-startup";
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { readActivityWatchData } from "./activitywatch";
+import { readActivityWatchCategories, readActivityWatchData } from "./activitywatch";
 import { configureAutoUpdates, type DesktopUpdater } from "./updates";
 import { DOWNLOAD_PAGE_URL } from "./update-feed";
 import { windowSizeForWorkArea } from "./window-sizing";
@@ -143,6 +143,10 @@ function registerIPC(): void {
   ipcMain.handle(IPC.activityWatchData, (event, range: unknown) => {
     assertTrustedSender(event);
     return readActivityWatchData(range);
+  });
+  ipcMain.handle(IPC.activityWatchCategories, event => {
+    assertTrustedSender(event);
+    return readActivityWatchCategories();
   });
   ipcMain.handle(IPC.saveActivityWatchExport, async (event, json: unknown) => {
     assertTrustedSender(event);

@@ -1,6 +1,7 @@
 import type {
   ActivityDevice,
   ActivityWatchBucket,
+  ActivityWatchCategory,
   ActivityWatchRange,
   ActivityWatchRecord,
   ActivityWatchSnapshot,
@@ -64,6 +65,34 @@ function validateRange(value: unknown): ActivityWatchRange {
     throw new Error("The ActivityWatch date range is invalid or too large.");
   }
   return { start: start === null ? null : new Date(start).toISOString(), end: new Date(end).toISOString(), includeBrowserTabs: value.includeBrowserTabs === true };
+}
+
+export async function readActivityWatchCategories(): Promise<ActivityWatchCategory[]> {
+  // ActivityWatch stores the merged active rule sets in the classes setting.
+  const payload = await requestJson(`${ACTIVITYWATCH_API}/settings/classes`);
+  if (!Array.isArray(payload)) return [];
+  return payload.flatMap((value): ActivityWatchCategory[] => {
+    if (!isRecord(value) || !Array.isArray(value.name)) return [];
+    const path = value.name.filter((part): part is string => typeof part === "string" && Boolean(part.trim()));
+    if (!path.length) return [];
+    const rule = isRecord(value.rule) ? value.rule : {};
+    const priority = rule.priority ?? rule.weight;
+    const fields = Array.isArray(rule.select_keys)
+      ? rule.select_keys.filter((key): key is string => typeof key === "string" && Boolean(key))
+      : [];
+    return [{
+      path,
+      color: isRecord(value.data) ? asString(value.data.color) : null,
+      rule: rule.type === "regex" && typeof rule.regex === "string" && rule.regex
+        ? {
+            pattern: rule.regex,
+            ignoreCase: rule.ignore_case === true,
+            priority: typeof priority === "number" && Number.isInteger(priority) ? priority : path.length * 10,
+            fields: fields.length ? fields : ["app", "title"]
+          }
+        : null
+    }];
+  });
 }
 
 async function requestJson(url: string): Promise<unknown> {

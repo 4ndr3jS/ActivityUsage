@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { readActivityWatchData } from "./activitywatch";
+import { readActivityWatchCategories, readActivityWatchData } from "./activitywatch";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -25,4 +25,21 @@ it("loads collected history beyond one year when the start date is open", async 
     { timestamp: "2024-01-01T00:00:00.000Z", duration: 60 },
     { timestamp: "2026-11-15T23:59:50.000Z", duration: 10 }
   ]);
+});
+
+it("reads the effective ActivityWatch classes, retaining hierarchy, colors, and rule fields", async () => {
+  const fetch = vi.fn(async () => Response.json([
+    { name: ["Reading"], data: { color: "#aabbcc" }, rule: { type: "none" } },
+    { name: ["Reading", "Books"], rule: { type: "regex", regex: "Novel", ignore_case: true } },
+    { name: ["Games"], rule: { type: "regex", regex: "^Game$", select_keys: ["app"], priority: 30 } },
+    { name: [""] }
+  ]));
+  vi.stubGlobal("fetch", fetch);
+
+  expect(await readActivityWatchCategories()).toEqual([
+    { path: ["Reading"], color: "#aabbcc", rule: null },
+    { path: ["Reading", "Books"], color: null, rule: { pattern: "Novel", ignoreCase: true, priority: 20, fields: ["app", "title"] } },
+    { path: ["Games"], color: null, rule: { pattern: "^Game$", ignoreCase: false, priority: 30, fields: ["app"] } }
+  ]);
+  expect(fetch).toHaveBeenCalledWith("http://127.0.0.1:5600/api/0/settings/classes", expect.any(Object));
 });

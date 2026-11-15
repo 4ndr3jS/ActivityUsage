@@ -52,6 +52,10 @@ export function TrendsIcon(props: IconProps): React.JSX.Element {
   return <IconBase {...props}><path d="M4 18 9 12l4 3 7-9M16 6h4v4" /></IconBase>;
 }
 
+export function StatisticsIcon(props: IconProps): React.JSX.Element {
+  return <IconBase {...props}><rect x="4" y="4" width="16" height="16" rx="3" /><path d="M8 9h8M8 12h5M8 15h3" /></IconBase>;
+}
+
 export function InsightsIcon(props: IconProps): React.JSX.Element {
   return (
     <IconBase {...props}>

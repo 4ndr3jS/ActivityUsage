@@ -20,13 +20,15 @@ import { appLabel } from "../app-label";
 import { buildBrowserActivity, type BrowserActivity } from "../browser-activity";
 import { formatPeriodLabel, shiftDay, todayDay, type AnalyticsRange } from "../personal-analytics";
 import { TimeNavigator } from "./AnalyzerControls";
+import { ActivityStatistics } from "./ActivityStatistics";
 import "./activity-dashboard.css";
 
 type ActivityRange = 1 | AnalyticsRange;
-export type ActivityView = "overview" | "history" | "breakdown" | "insights" | "sources" | "settings";
+export type ActivityView = "overview" | "history" | "breakdown" | "statistics" | "insights" | "sources" | "settings";
 type DeviceFilter = "all" | ActivityDevice;
 const EMPTY_EVENTS: ActivityWatchRecord[] = [];
 const DEFAULT_HISTORY_DAYS = 30;
+const WINDOW_TITLES_KEY = "activityusage.activity.showTitles";
 
 interface Period {
   start: Date;
@@ -61,7 +63,7 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   const [periodOffset, setPeriodOffset] = useState(0);
   const [device, setDevice] = useState<DeviceFilter>("all");
   const [compare, setCompare] = useState(false);
-  const [showTitles, setShowTitles] = useState(() => readPreference("activityusage.activity.showTitles"));
+  const [showTitles, setShowTitles] = useState(() => readPreference(WINDOW_TITLES_KEY));
   const [includeLabels, setIncludeLabels] = useState(() => readPreference("activityusage.activity.includeLabels"));
   const [autoRefresh, setAutoRefresh] = useState(() => readPreference("activityusage.activity.autoRefresh", true));
   const [calendarDay, setCalendarDay] = useState(todayDay);
@@ -90,7 +92,7 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   }, [notice]);
 
   const selectedDay = pickedDay ?? calendarDay;
-  const comparePeriod = compare && range !== "all";
+  const comparePeriod = compare && range !== "all" && view !== "statistics";
   const requestedPeriod = useMemo(() => {
     const anchor = range === 1 ? selectedDay : calendarDay;
     return createActivityPeriod(range === "all" ? 1 : range, periodOffset, new Date(`${anchor}T12:00:00`));
@@ -200,6 +202,7 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
     overview: "Your device activity",
     history: "Activity history",
     breakdown: "Activity breakdown",
+    statistics: "Activity statistics",
     insights: "Your activity rhythm",
     sources: "ActivityWatch sources",
     settings: "Activity preferences"
@@ -278,7 +281,7 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
             <option value="all">All devices</option><option value="computer">Computer</option><option value="phone">Phone</option>
           </select>
         </label>
-        <label className="activity-switch"><input type="checkbox" checked={comparePeriod} disabled={range === "all"} onChange={event => setCompare(event.target.checked)} /><span>Compare</span></label>
+        {view !== "statistics" && <label className="activity-switch"><input type="checkbox" checked={comparePeriod} disabled={range === "all"} onChange={event => setCompare(event.target.checked)} /><span>Compare</span></label>}
         <div className="activity-toolbar__actions">
           <button className="activity-icon-button" type="button" aria-label="Refresh ActivityWatch" title="Refresh ActivityWatch" disabled={loading} onClick={() => void loadData(true)}>
             <RefreshIcon />
@@ -290,9 +293,10 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
       </div>
 
       {view !== "overview" && <header className="activity-dashboard__heading">
-        <div><p className="activity-eyebrow">{view === "history" ? "Collected history" : "Local device history"}</p>
+        <div>{view !== "statistics" && <p className="activity-eyebrow">{view === "history" ? "Collected history" : "Local device history"}</p>}
           <h1>{pageTitle[view]}</h1>
-          <p className="activity-dashboard__subtitle">{view === "history" ? "How your computer and phone activity changes over time." : "Your ActivityWatch history, kept on this computer."}</p>
+          <p className="activity-dashboard__subtitle">{view === "history" ? "How your computer and phone activity changes over time."
+            : view === "statistics" ? periodLabel : "Your ActivityWatch history, kept on this computer."}</p>
         </div>
         <div className={`activity-live-pill${error ? " is-offline" : ""}`}><span />{error ? "ActivityWatch unavailable" : snapshot ? "ActivityWatch connected" : "Reading activity…"}</div>
       </header>}
@@ -307,6 +311,9 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
           {view === "overview" && <OverviewView days={visibleDays} hours={hours} apps={apps} periodLabel={periodLabel} singleDay={range === 1} summary={summary} previous={comparePeriod ? previousSummary : null} peakDay={peakDay} />}
           {view === "history" && <HistoryView days={visibleDays} periodLabel={periodLabel} summary={summary} previous={comparePeriod ? previousSummary : null} />}
           {view === "breakdown" && <BreakdownView apps={apps} browsers={browsers} browserStatus={browserStatus} />}
+          {view === "statistics" && <ActivityStatistics events={visibleEvents} period={period} hourly={range === 1}
+            allDevices={device === "all"} fetchedAt={snapshot.fetchedAt} showTitles={showTitles}
+            onToggleTitles={() => updatePreference(WINDOW_TITLES_KEY, !showTitles, setShowTitles)} />}
           {view === "insights" && <InsightsView days={visibleDays} hours={hourProfile} apps={apps} summary={summary} />}
           <footer className="activity-dashboard__footer">
             <span>{visibleEvents.length.toLocaleString()} recorded events · {periodLabel}</span>
@@ -316,7 +323,7 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
       )}
       {view === "sources" && <SourcesView snapshot={snapshot} device={device} />}
       {view === "settings" && <ActivitySettingsView showTitles={showTitles} includeLabels={includeLabels} autoRefresh={autoRefresh}
-        onShowTitles={value => updatePreference("activityusage.activity.showTitles", value, setShowTitles)}
+        onShowTitles={value => updatePreference(WINDOW_TITLES_KEY, value, setShowTitles)}
         onIncludeLabels={value => updatePreference("activityusage.activity.includeLabels", value, setIncludeLabels)}
         onAutoRefresh={value => updatePreference("activityusage.activity.autoRefresh", value, setAutoRefresh)} />}
     </section>

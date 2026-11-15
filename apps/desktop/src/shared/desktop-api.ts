@@ -2,7 +2,7 @@ import type { DashboardSnapshot } from "@activityusage/contracts";
 import type { GrowthEvent, GrowthEventProperties } from "./growth-events";
 import type { ProviderCredential, ProviderCredentialStatus, QuotaProviderId } from "./quota-providers";
 
-export type AppRoute = "day" | "trends" | "insights" | "limits" | "alerts" | "profile" | "settings" | "diagnostics" | "activity" | "sources";
+export type AppRoute = "day" | "trends" | "insights" | "limits" | "alerts" | "profile" | "settings" | "diagnostics" | "activity" | "statistics" | "sources";
 export type EngineStatus = "starting" | "ready" | "degraded" | "stopped";
 
 export interface ActivityWatchRange {
@@ -48,6 +48,17 @@ export interface ActivityWatchSnapshot {
   buckets: ActivityWatchBucket[];
   events: ActivityWatchRecord[];
   tabs: ActivityWatchTab[];
+}
+
+export interface ActivityWatchCategory {
+  path: string[];
+  color: string | null;
+  rule: {
+    pattern: string;
+    ignoreCase: boolean;
+    priority: number;
+    fields: string[];
+  } | null;
 }
 
 export interface DesktopUpdateState {
@@ -167,6 +178,7 @@ export interface ActivityUsageDesktopAPI {
   getSnapshot(): Promise<DashboardState>;
   refreshAll(): Promise<DashboardState>;
   getActivityWatchData(range: ActivityWatchRange): Promise<ActivityWatchSnapshot>;
+  getActivityWatchCategories(): Promise<ActivityWatchCategory[]>;
   saveActivityWatchExport(json: string): Promise<boolean>;
   setProviderEnabled(providerID: string, enabled: boolean): Promise<DashboardState>;
   getPreferences(): Promise<DesktopPreferences>;
@@ -198,6 +210,7 @@ export const IPC = {
   snapshot: "dashboard:snapshot",
   refreshAll: "dashboard:refresh-all",
   activityWatchData: "activitywatch:data",
+  activityWatchCategories: "activitywatch:categories",
   saveActivityWatchExport: "activitywatch:export",
   setProviderEnabled: "dashboard:set-provider-enabled",
   getPreferences: "preferences:get",

@@ -38,7 +38,11 @@ export const PALETTE: Record<DitherColor, Seed> = {
 export const rgb = ([r, g, b]: Rgb, k = 1, a = 1) =>
   `rgba(${Math.round(r * k)},${Math.round(g * k)},${Math.round(b * k)},${a})`
 
-export const seedOfColor = (color: DitherColor): Seed => PALETTE[color]
+export function seedOfColor(color: DitherColor | Rgb): Seed {
+  if (typeof color === "string") return PALETTE[color]
+  const tint = (amount: number) => color.map(channel => Math.round(channel + (255 - channel) * amount)) as Rgb
+  return { fill: color, line: tint(0.48), star: tint(0.78) }
+}
 
 export const isDitherColor = (value: unknown): value is DitherColor =>
   typeof value === "string" && value in PALETTE
