@@ -90,7 +90,7 @@ module.exports = {
     windowsSign,
     win32metadata: {
       CompanyName: "Activity Usage",
-      FileDescription: "AI provider usage at a glance",
+      FileDescription: "Activity Usage",
       InternalName: "Activity Usage",
       OriginalFilename: "ActivityUsage.exe",
       ProductName: "Activity Usage"

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ActivityDevice, ActivityWatchBucket, ActivityWatchRecord, ActivityWatchSnapshot } from "../../shared/desktop-api";
-import { ChevronLeftIcon, ChevronRightIcon, RefreshIcon, ShareIcon } from "../icons";
+import type { ActivityDevice, ActivityWatchBucket, ActivityWatchRange, ActivityWatchRecord, ActivityWatchSnapshot } from "../../shared/desktop-api";
+import { ChevronRightIcon, RefreshIcon, ShareIcon } from "../icons";
 import { Area } from "./dither-kit/area";
 import { AreaChart } from "./dither-kit/area-chart";
 import { Bar } from "./dither-kit/bar";
@@ -15,14 +15,18 @@ import { YAxis } from "./dither-kit/y-axis";
 import type { DitherColor } from "./dither-kit/palette";
 import { createActivityPeriod } from "../activity-period";
 import { subscribeActivityRefresh } from "../activity-refresh";
+import { activitySnapshotKey, createActivitySnapshotCache } from "../activity-snapshots";
 import { appLabel } from "../app-label";
 import { buildBrowserActivity, type BrowserActivity } from "../browser-activity";
+import { formatPeriodLabel, shiftDay, todayDay, type AnalyticsRange } from "../personal-analytics";
+import { TimeNavigator } from "./AnalyzerControls";
 import "./activity-dashboard.css";
 
-type RangeDays = 1 | 7 | 30 | 90 | 365;
+type ActivityRange = 1 | AnalyticsRange;
 export type ActivityView = "overview" | "history" | "breakdown" | "insights" | "sources" | "settings";
 type DeviceFilter = "all" | ActivityDevice;
 const EMPTY_EVENTS: ActivityWatchRecord[] = [];
+const DEFAULT_HISTORY_DAYS = 30;
 
 interface Period {
   start: Date;
@@ -49,8 +53,10 @@ interface AppActivity {
 }
 
 export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.Element {
-  const [rangeDays, setRangeDays] = useState<RangeDays>(view === "overview" ? 1 : 30);
-  const previousView = useRef(view);
+  const isOverview = view === "overview";
+  const [range, setRange] = useState<ActivityRange>(isOverview ? 1 : DEFAULT_HISTORY_DAYS);
+  const [pickedDay, setPickedDay] = useState<string | null>(null);
+  const [wasOverview, setWasOverview] = useState(isOverview);
   const requestVersion = useRef(0);
   const [periodOffset, setPeriodOffset] = useState(0);
   const [device, setDevice] = useState<DeviceFilter>("all");
@@ -58,14 +64,24 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   const [showTitles, setShowTitles] = useState(() => readPreference("activityusage.activity.showTitles"));
   const [includeLabels, setIncludeLabels] = useState(() => readPreference("activityusage.activity.includeLabels"));
   const [autoRefresh, setAutoRefresh] = useState(() => readPreference("activityusage.activity.autoRefresh", true));
-  const [calendarDay, setCalendarDay] = useState(() => localDateKey(new Date()));
+  const [calendarDay, setCalendarDay] = useState(todayDay);
   const autoRequestRunning = useRef(false);
-  const [snapshot, setSnapshot] = useState<ActivityWatchSnapshot | null>(null);
-  const [previousSnapshot, setPreviousSnapshot] = useState<ActivityWatchSnapshot | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [snapshots, setSnapshots] = useState<ReadonlyMap<string, ActivityWatchSnapshot>>(() => new Map());
+  const [readSnapshot] = useState(() => createActivitySnapshotCache(
+    range => window.usageAtlas.getActivityWatchData(range), setSnapshots
+  ));
+  const [requestState, setRequestState] = useState<{ key: string; loading: boolean; error: string | null } | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // Apply the default range before committing a view switch so it reads the
+  // right cached snapshot on its first render.
+  if (wasOverview !== isOverview) {
+    setWasOverview(isOverview);
+    setRange(isOverview ? 1 : DEFAULT_HISTORY_DAYS);
+    setPickedDay(null);
+    setPeriodOffset(0);
+  }
 
   useEffect(() => {
     if (!notice) return;
@@ -73,53 +89,74 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  useEffect(() => {
-    const wasOverview = previousView.current === "overview";
-    const isOverview = view === "overview";
-    if (wasOverview !== isOverview) {
-      setRangeDays(isOverview ? 1 : 30);
-      setPeriodOffset(0);
-    }
-    previousView.current = view;
-  }, [view]);
-
-  const period = useMemo(() => createActivityPeriod(rangeDays, periodOffset, new Date(calendarDay + "T12:00:00")), [periodOffset, rangeDays, calendarDay]);
+  const selectedDay = pickedDay ?? calendarDay;
+  const comparePeriod = compare && range !== "all";
+  const requestedPeriod = useMemo(() => {
+    const anchor = range === 1 ? selectedDay : calendarDay;
+    return createActivityPeriod(range === "all" ? 1 : range, periodOffset, new Date(`${anchor}T12:00:00`));
+  }, [calendarDay, periodOffset, range, selectedDay]);
   const includeBrowserTabs = view === "breakdown";
-  const loadData = useCallback(async (silent = false): Promise<void> => {
+  const currentQuery = useMemo<ActivityWatchRange>(() => ({
+    start: range === "all" ? null : requestedPeriod.start.toISOString(),
+    end: requestedPeriod.end.toISOString(),
+    includeBrowserTabs
+  }), [range, requestedPeriod, includeBrowserTabs]);
+  const previousQuery = useMemo<ActivityWatchRange | null>(() => {
+    if (!comparePeriod) return null;
+    const start = new Date(requestedPeriod.start);
+    start.setDate(start.getDate() - range);
+    return { start: start.toISOString(), end: requestedPeriod.start.toISOString() };
+  }, [comparePeriod, range, requestedPeriod]);
+  const currentKey = activitySnapshotKey(currentQuery);
+  const previousKey = previousQuery ? activitySnapshotKey(previousQuery) : null;
+  const requestKey = JSON.stringify([currentKey, previousKey]);
+  const requestedSnapshot = snapshots.get(currentKey);
+  const snapshot = requestedSnapshot ?? (includeBrowserTabs
+    ? snapshots.get(activitySnapshotKey({ ...currentQuery, includeBrowserTabs: false })) ?? null
+    : null);
+  const previousSnapshot = previousKey ? snapshots.get(previousKey) : undefined;
+  const activeRequest = requestState?.key === requestKey ? requestState : null;
+  const error = activeRequest?.error ?? null;
+  const loading = activeRequest?.loading ?? !requestedSnapshot;
+  const browserStatus = includeBrowserTabs && !requestedSnapshot
+    ? (error ? "Browser details unavailable." : "Reading browser activity…")
+    : null;
+
+  const loadData = useCallback(async (refresh = false): Promise<void> => {
     const request = ++requestVersion.current;
-    setLoading(true);
-    setError(null);
-    if (!silent) {
-      setSnapshot(null);
-      setPreviousSnapshot(null);
-    }
+    setRequestState({ key: requestKey, loading: true, error: null });
     try {
-      const currentRange = { start: period.start.toISOString(), end: period.end.toISOString(), includeBrowserTabs };
-      const previousRange = {
-        start: new Date(new Date(period.start).setDate(period.start.getDate() - rangeDays)).toISOString(),
-        end: period.start.toISOString()
-      };
-      const currentPromise = window.usageAtlas.getActivityWatchData(currentRange);
-      const previousPromise = compare ? window.usageAtlas.getActivityWatchData(previousRange) : Promise.resolve(null);
-      const [current, previous] = await Promise.all([currentPromise, previousPromise]);
-      if (request !== requestVersion.current) return;
-      setSnapshot(current);
-      setPreviousSnapshot(previous);
+      await Promise.all([
+        readSnapshot(currentQuery, refresh),
+        previousQuery ? readSnapshot(previousQuery, refresh) : null
+      ]);
+      if (request === requestVersion.current) setRequestState({ key: requestKey, loading: false, error: null });
     } catch (caught: unknown) {
-      if (request === requestVersion.current) setError(caught instanceof Error ? caught.message : "ActivityWatch could not be reached.");
-    } finally {
-      if (request === requestVersion.current) setLoading(false);
+      if (request === requestVersion.current) setRequestState({
+        key: requestKey, loading: false,
+        error: caught instanceof Error ? caught.message : "ActivityWatch could not be reached."
+      });
     }
-  }, [compare, includeBrowserTabs, period, rangeDays]);
+  }, [readSnapshot, currentQuery, previousQuery, requestKey]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => { void loadData(); }, 0);
     return () => { window.clearTimeout(timer); requestVersion.current += 1; };
   }, [loadData]);
   useEffect(() => {
+    const { start, end } = createActivityPeriod(DEFAULT_HISTORY_DAYS, 0, new Date(`${calendarDay}T12:00:00`));
+    const dates = { start: start.toISOString(), end: end.toISOString() };
+    // History and Breakdown use distinct cache entries for the same dates.
+    // Preload both so opening either view can reuse its in-flight request.
+    void Promise.allSettled([
+      readSnapshot(dates),
+      readSnapshot({ ...dates, includeBrowserTabs: true })
+    ]);
+  }, [calendarDay, isOverview, readSnapshot]);
+  useEffect(() => {
     if (!autoRefresh) return undefined;
     return subscribeActivityRefresh(() => {
-      const today = localDateKey(new Date());
+      const today = todayDay();
       if (today !== calendarDay) { setCalendarDay(today); return; }
       if (autoRequestRunning.current) return;
       autoRequestRunning.current = true;
@@ -128,29 +165,37 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   }, [autoRefresh, calendarDay, loadData]);
 
   const events = snapshot?.events ?? EMPTY_EVENTS;
+  const firstEvent = events[0]?.timestamp;
+  const period = useMemo(() => {
+    if (range !== "all" || !firstEvent) return requestedPeriod;
+    const start = new Date(firstEvent);
+    start.setHours(0, 0, 0, 0);
+    return { start, end: requestedPeriod.end };
+  }, [firstEvent, range, requestedPeriod]);
   const visibleEvents = useMemo(() => filterEvents(events, device), [device, events]);
   const summary = useMemo(() => summarize(events, device), [device, events]);
   const previousSummary = useMemo(
-    () => summarize(previousSnapshot?.events ?? [], device),
+    () => previousSnapshot ? summarize(previousSnapshot.events, device) : null,
     [device, previousSnapshot]
   );
-  const days = useMemo(() => buildDays(events, period, rangeDays), [events, period, rangeDays]);
+  const days = useMemo(() => buildDays(events, period), [events, period]);
   const visibleDays = useMemo(() => days.map(day => {
     if (device === "computer") return { ...day, phone: 0, combined: day.computer };
     if (device === "phone") return { ...day, computer: 0, combined: day.phone };
     return day;
   }), [days, device]);
-  const needsHours = view === "overview" && rangeDays === 1;
+  const needsHours = view === "overview" && range === 1;
   const needsHourProfile = view === "insights";
   const needsApps = view === "overview" || view === "breakdown" || view === "insights";
   const hours = useMemo(() => needsHours ? buildHours(events, period.start, device) : [], [device, events, period.start, needsHours]);
   const hourProfile = useMemo(() => needsHourProfile ? buildHourProfile(events, device) : [], [device, events, needsHourProfile]);
   const apps = useMemo(() => needsApps ? buildApps(visibleEvents, showTitles && !includeBrowserTabs) : [], [showTitles, visibleEvents, needsApps, includeBrowserTabs]);
-  const browsers = useMemo(() => includeBrowserTabs && snapshot
-    ? buildBrowserActivity(visibleEvents, snapshot.tabs, snapshot.buckets)
-    : new Map<string, BrowserActivity>(), [includeBrowserTabs, snapshot, visibleEvents]);
+  const browsers = useMemo(() => includeBrowserTabs && requestedSnapshot
+    ? buildBrowserActivity(visibleEvents, requestedSnapshot.tabs, requestedSnapshot.buckets)
+    : new Map<string, BrowserActivity>(), [includeBrowserTabs, requestedSnapshot, visibleEvents]);
   const peakDay = visibleDays.reduce<DayActivity | null>((peak, day) => !peak || day.combined > peak.combined ? day : peak, null);
-  const periodLabel = labelPeriod(period, rangeDays);
+  const periodLabel = labelPeriod(period, range, calendarDay);
+  const navigatorLabel = range === 1 || periodOffset < 0 ? periodLabel : formatPeriodLabel(range);
   const pageTitle: Record<ActivityView, string> = {
     overview: "Your device activity",
     history: "Activity history",
@@ -163,6 +208,23 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   function updatePreference(key: string, next: boolean, setter: (value: boolean) => void): void {
     setter(next);
     try { window.localStorage.setItem(key, next ? "1" : "0"); } catch { /* Keep the current session usable if storage is disabled. */ }
+  }
+
+  function selectDay(day: string): void {
+    setRange(1);
+    setPickedDay(day === calendarDay ? null : day);
+    setPeriodOffset(0);
+  }
+
+  function selectRange(nextRange: AnalyticsRange): void {
+    setRange(nextRange);
+    setPickedDay(null);
+    setPeriodOffset(0);
+  }
+
+  function movePeriod(offset: -1 | 1): void {
+    if (range === 1) selectDay(shiftDay(selectedDay, offset));
+    else setPeriodOffset(value => Math.min(0, value + offset));
   }
 
   async function exportSummary(): Promise<void> {
@@ -185,7 +247,7 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
       const saved = await window.usageAtlas.saveActivityWatchExport(JSON.stringify(payload, null, 2));
       if (saved) setNotice("Activity summary saved.");
     } catch (caught: unknown) {
-      setError(caught instanceof Error ? caught.message : "The activity summary could not be saved.");
+      setNotice(caught instanceof Error ? caught.message : "The activity summary could not be saved.");
     } finally {
       setExporting(false);
     }
@@ -197,25 +259,28 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
 
       <div className="activity-toolbar" aria-label="Activity controls">
         <div className="activity-period-controls">
-          <button className="activity-icon-button" type="button" aria-label="Previous period" onClick={() => setPeriodOffset(value => value - 1)}>
-            <ChevronLeftIcon />
-          </button>
-          <select aria-label="Date range" value={rangeDays} onChange={event => { setRangeDays(Number(event.target.value) as RangeDays); setPeriodOffset(0); }}>
-            <option value={1}>{periodOffset === 0 ? "Today" : periodLabel}</option><option value={7}>Last 7 days</option><option value={30}>Last 30 days</option>
-            <option value={90}>Last 90 days</option><option value={365}>Last 12 months</option>
-          </select>
-          <button className="activity-icon-button" type="button" aria-label="Next period" disabled={periodOffset >= 0} onClick={() => setPeriodOffset(value => Math.min(0, value + 1))}>
-            <ChevronRightIcon />
-          </button>
+          <TimeNavigator
+            canMoveBack={range !== "all"}
+            canMoveForward={range === 1 ? selectedDay < calendarDay : periodOffset < 0}
+            label={navigatorLabel}
+            mode={range === 1 ? "day" : "range"}
+            onMoveBack={() => movePeriod(-1)}
+            onMoveForward={() => movePeriod(1)}
+            onSelectDay={selectDay}
+            onSelectRange={selectRange}
+            selectedDay={selectedDay}
+            selectedRange={range === 1 ? undefined : range}
+            today={calendarDay}
+          />
         </div>
         <label className="activity-select-label">Device
           <select aria-label="Filter by device" value={device} onChange={event => setDevice(event.target.value as DeviceFilter)}>
             <option value="all">All devices</option><option value="computer">Computer</option><option value="phone">Phone</option>
           </select>
         </label>
-        <label className="activity-switch"><input type="checkbox" checked={compare} onChange={event => setCompare(event.target.checked)} /><span>Compare</span></label>
+        <label className="activity-switch"><input type="checkbox" checked={comparePeriod} disabled={range === "all"} onChange={event => setCompare(event.target.checked)} /><span>Compare</span></label>
         <div className="activity-toolbar__actions">
-          <button className="activity-icon-button" type="button" aria-label="Refresh ActivityWatch" title="Refresh ActivityWatch" disabled={loading} onClick={() => void loadData()}>
+          <button className="activity-icon-button" type="button" aria-label="Refresh ActivityWatch" title="Refresh ActivityWatch" disabled={loading} onClick={() => void loadData(true)}>
             <RefreshIcon />
           </button>
           <button className="activity-button" type="button" disabled={!snapshot || exporting} onClick={() => void exportSummary()}>
@@ -232,16 +297,16 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
         <div className={`activity-live-pill${error ? " is-offline" : ""}`}><span />{error ? "ActivityWatch unavailable" : snapshot ? "ActivityWatch connected" : "Reading activity…"}</div>
       </header>}
 
-      {error && <div className="activity-error" role="alert"><strong>ActivityWatch data unavailable</strong><span>{error}</span><button type="button" onClick={() => void loadData()}>Retry</button></div>}
+      {error && <div className="activity-error" role="alert"><strong>ActivityWatch data unavailable</strong><span>{error}</span><button type="button" onClick={() => void loadData(true)}>Retry</button></div>}
       {notice && <div className="activity-notice" role="status"><span>{notice}</span><button type="button" aria-label="Dismiss notification" onClick={() => setNotice(null)}>×</button></div>}
-      {loading && !snapshot && <div className="activity-loading" role="status"><span className="activity-spinner" />Reading local ActivityWatch history…</div>}
+      {view !== "history" && view !== "breakdown" && loading && !snapshot && <div className="activity-loading" role="status"><span className="activity-spinner" />Reading local ActivityWatch history…</div>}
       {!loading && !snapshot && !error && <div className="activity-empty">No ActivityWatch records are available yet.</div>}
 
       {snapshot && view !== "sources" && view !== "settings" && (
         <>
-          {view === "overview" && <OverviewView days={visibleDays} hours={hours} apps={apps} periodLabel={periodLabel} rangeDays={rangeDays} summary={summary} previous={compare ? previousSummary : null} peakDay={peakDay} />}
-          {view === "history" && <HistoryView days={visibleDays} periodLabel={periodLabel} summary={summary} previous={compare ? previousSummary : null} />}
-          {view === "breakdown" && <BreakdownView apps={apps} browsers={browsers} />}
+          {view === "overview" && <OverviewView days={visibleDays} hours={hours} apps={apps} periodLabel={periodLabel} singleDay={range === 1} summary={summary} previous={comparePeriod ? previousSummary : null} peakDay={peakDay} />}
+          {view === "history" && <HistoryView days={visibleDays} periodLabel={periodLabel} summary={summary} previous={comparePeriod ? previousSummary : null} />}
+          {view === "breakdown" && <BreakdownView apps={apps} browsers={browsers} browserStatus={browserStatus} />}
           {view === "insights" && <InsightsView days={visibleDays} hours={hourProfile} apps={apps} summary={summary} />}
           <footer className="activity-dashboard__footer">
             <span>{visibleEvents.length.toLocaleString()} recorded events · {periodLabel}</span>
@@ -271,14 +336,14 @@ function dailyRows(days: DayActivity[], key: "computer" | "phone" | "combined"):
   return days.map(day => ({ key: day.key, label: day.label, seconds: day[key] }));
 }
 
-function OverviewView({ days, hours, apps, periodLabel, rangeDays, summary, previous, peakDay }: {
+function OverviewView({ days, hours, apps, periodLabel, singleDay, summary, previous, peakDay }: {
   days: DayActivity[]; hours: ActivityRow[]; apps: AppActivity[]; periodLabel: string;
-  rangeDays: RangeDays; summary: Summary; previous: Summary | null; peakDay: DayActivity | null;
+  singleDay: boolean; summary: Summary; previous: Summary | null; peakDay: DayActivity | null;
 }): React.JSX.Element {
   return <>
     <div className="activity-hero-grid">
       <section className="activity-glass-card activity-hero">
-        <p className="activity-eyebrow">{rangeDays === 1 && days[0] ? new Date(`${days[0].key}T12:00:00`).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" }) : periodLabel}</p>
+        <p className="activity-eyebrow">{singleDay && days[0] ? new Date(`${days[0].key}T12:00:00`).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" }) : periodLabel}</p>
         <h1>Your device activity</h1>
         <div className="activity-hero-metric"><span>Combined active time</span><strong>{formatDuration(summary.combined)}</strong></div>
         <p className="activity-hero-context">{previous ? compareDelta(summary.combined, previous.combined) : "Overlapping device time counted once"}</p>
@@ -295,8 +360,8 @@ function OverviewView({ days, hours, apps, periodLabel, rangeDays, summary, prev
       <MetricCard title="Peak day" value={peakDay && peakDay.combined > 0 ? formatDuration(peakDay.combined) : "0m"} note={peakDay && peakDay.combined > 0 ? peakDay.label : "No recorded activity"} />
       <MetricCard title="Recorded overlap" value={formatDuration(summary.overlap)} note="Time both devices were active" />
     </div>
-    <SectionHeading eyebrow="Selected period" title={rangeDays === 1 ? "Usage through the day" : "Usage through the period"} detail={periodLabel} />
-    <ChartPanel title={rangeDays === 1 ? "Hourly activity" : "Combined activity"} subtitle="Combined active time, with overlap counted once" rows={rangeDays === 1 ? hours : dailyRows(days, "combined")} tone="blue" kind={rangeDays === 1 ? "bar" : "area"} />
+    <SectionHeading eyebrow="Selected period" title={singleDay ? "Usage through the day" : "Usage through the period"} detail={periodLabel} />
+    <ChartPanel title={singleDay ? "Hourly activity" : "Combined activity"} subtitle="Combined active time, with overlap counted once" rows={singleDay ? hours : dailyRows(days, "combined")} tone="blue" kind={singleDay ? "bar" : "area"} />
     <SectionHeading eyebrow="Applications" title="Where your time went" detail={periodLabel} />
     <AppList apps={apps.slice(0, 8)} title="Most used apps" subtitle="Ranked by recorded app time" />
   </>;
@@ -350,7 +415,9 @@ function DeviceMix({ summary }: { summary: Summary }): React.JSX.Element {
   </section>;
 }
 
-function BreakdownView({ apps, browsers }: { apps: AppActivity[]; browsers: ReadonlyMap<string, BrowserActivity> }): React.JSX.Element {
+function BreakdownView({ apps, browsers, browserStatus }: {
+  apps: AppActivity[]; browsers: ReadonlyMap<string, BrowserActivity>; browserStatus: string | null;
+}): React.JSX.Element {
   const [selection, setSelection] = useState<string>();
   const selected = selection && browsers.has(selection) ? selection
     : apps.find(app => browsers.has(app.label))?.label;
@@ -361,7 +428,9 @@ function BreakdownView({ apps, browsers }: { apps: AppActivity[]; browsers: Read
     {selected && activity
       ? <BrowserActivityPanel key={selected} browser={selected} activity={activity} />
       : <section className="activity-glass-card activity-browser-panel">
-        <div className="activity-chart-panel__header"><div><h3>Browser activity</h3><p>No browser use recorded for this device and date range.</p></div></div>
+        <div className="activity-chart-panel__header"><div><h3>Browser activity</h3>
+          <p role="status">{browserStatus ?? "No browser use recorded for this device and date range."}</p>
+        </div></div>
       </section>}
   </div>;
 }
@@ -384,7 +453,6 @@ function BrowserActivityPanel({ browser, activity }: { browser: string; activity
     {rows.length ? <ol className="activity-browser-list">
       {rows.slice(0, limit).map(row => <li key={JSON.stringify([row.label, row.address])}>
         <div className="activity-app-row"><span title={row.label}>{row.label}</span><b>{duration(row.seconds)}</b></div>
-        {row.address && <small title={row.address}>{row.address}</small>}
         <div className="activity-app-track" aria-hidden="true"><i style={{ width: `${row.seconds / rows[0].seconds * 100}%` }} /></div>
       </li>)}
     </ol> : <p className="activity-explainer">No matching tab records for this browser in the selected period. ActivityWatch’s browser watcher supplies website and page details.</p>}
@@ -548,11 +616,18 @@ function PreferenceToggle({ checked, label, note, onChange }: { checked: boolean
   return <label className="activity-preference"><span><strong>{label}</strong><small>{note}</small></span><input type="checkbox" checked={checked} onChange={event => onChange(event.target.checked)} /></label>;
 }
 
-function labelPeriod(period: Period, days: RangeDays): string {
-  if (days === 1 && period.end.getTime() > Date.now()) return "Today";
+function labelPeriod(period: Period, range: ActivityRange, today: string): string {
+  const day = todayDay(period.start);
+  if (range === 1 && day === today) return "Today";
+  if (range === 1 && day === shiftDay(today, -1)) return "Yesterday";
   const last = new Date(period.end);
   last.setDate(last.getDate() - 1);
-  return `${period.start.toLocaleDateString([], { month: "short", day: "numeric" })} – ${last.toLocaleDateString([], { month: "short", day: "numeric" })}`;
+  const options: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+  if (last.getFullYear() !== Number(today.slice(0, 4)) || period.start.getFullYear() !== last.getFullYear()) {
+    options.year = "numeric";
+  }
+  const label = period.start.toLocaleDateString([], options);
+  return day === todayDay(last) ? label : `${label} – ${last.toLocaleDateString([], options)}`;
 }
 
 function filterEvents(events: ActivityWatchRecord[], device: DeviceFilter): ActivityWatchRecord[] {
@@ -591,14 +666,15 @@ function summarize(events: ActivityWatchRecord[], device: DeviceFilter): Summary
   return { computer, phone, combined, overlap: Math.max(0, computer + phone - combined) };
 }
 
-function buildDays(events: ActivityWatchRecord[], period: Period, days: RangeDays): DayActivity[] {
-  const ranges = Array.from({ length: days }, (_, index) => {
-    const start = new Date(period.start);
-    start.setDate(start.getDate() + index);
+function buildDays(events: ActivityWatchRecord[], period: Period): DayActivity[] {
+  const ranges = [];
+  for (let start = new Date(period.start); start < period.end;) {
     const end = new Date(start);
     end.setDate(end.getDate() + 1);
-    return { start, end, key: localDateKey(start), label: start.toLocaleDateString([], { month: "short", day: "numeric" }) };
-  });
+    end.setHours(0, 0, 0, 0);
+    ranges.push({ start, end, key: todayDay(start), label: start.toLocaleDateString([], { month: "short", day: "numeric" }) });
+    start = end;
+  }
   const computerByDay = ranges.map(() => [] as Interval[]);
   const phoneByDay = ranges.map(() => [] as Interval[]);
   distributeIntervals(recordIntervals(events, "computer"), ranges, computerByDay);
@@ -648,7 +724,7 @@ function buildHours(events: ActivityWatchRecord[], dayStart: Date, device: Devic
     const end = new Date(dayStart);
     end.setHours(hour + 1, 0, 0, 0);
     return {
-      key: `${localDateKey(dayStart)}-${hour}`,
+      key: `${todayDay(dayStart)}-${hour}`,
       label: start.toLocaleTimeString([], { hour: "numeric" }),
       seconds: intervalSeconds(mergeIntervals(clipIntervals(intervals, start.getTime(), end.getTime())))
     };
@@ -713,8 +789,4 @@ function formatDuration(seconds: number): string {
 
 function readPreference(key: string, fallback = false): boolean {
   try { const value = window.localStorage.getItem(key); return value === null ? fallback : value === "1"; } catch { return fallback; }
-}
-
-function localDateKey(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }

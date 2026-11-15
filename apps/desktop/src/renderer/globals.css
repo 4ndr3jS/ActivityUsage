@@ -749,6 +749,7 @@
 }
 
 .atlas-toolbar :is(.button--secondary, .button--tertiary),
+.activity-period-controls :is(.atlas-toolbar-icon, .atlas-period-trigger),
 .atlas-toolbar .select__trigger {
   background: var(--atlas-glass-sheen), var(--atlas-material-thin);
   box-shadow: var(--atlas-ring);
@@ -760,6 +761,7 @@
 }
 
 .atlas-toolbar :is(.button--secondary, .button--tertiary):hover,
+.activity-period-controls :is(.atlas-toolbar-icon, .atlas-period-trigger)[data-hovered],
 .atlas-toolbar .select__trigger:hover {
   background: var(--atlas-glass-sheen), color-mix(in oklch, var(--surface-secondary) 70%, transparent);
   box-shadow: var(--atlas-ring-hover);
@@ -845,6 +847,24 @@
   background: var(--accent-soft);
 }
 
+.atlas-time-popover {
+  width: min(28rem, calc(100vw - 2rem));
+  border-radius: 24px;
+}
+
+.atlas-time-menu {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  padding: 12px;
+}
+
+@media (max-width: 460px) {
+  .atlas-time-menu {
+    grid-template-columns: 1fr;
+  }
+}
+
 .atlas-time-menu-section {
   display: flex;
   min-width: 0;
@@ -890,7 +910,7 @@
 .atlas-time-date-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   padding-block-start: 4px;
 }
 
@@ -898,11 +918,11 @@
    chrome, so it needs the shared field surface, border, and focus ring. */
 .atlas-time-date {
   width: 100%;
-  min-height: 40px;
+  min-height: 36px;
   padding-inline: 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--field-background);
+  border: 1px solid var(--atlas-edge);
+  border-radius: 12px;
+  background: var(--default);
   color: var(--foreground);
   font: inherit;
   font-size: 0.8125rem;

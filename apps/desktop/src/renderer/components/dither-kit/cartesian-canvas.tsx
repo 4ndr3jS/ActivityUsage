@@ -6,10 +6,17 @@ import {
   backingSize,
   bloomLayerStyle,
   easeInOutCubic,
+  HOVER_FRAME_MS,
+  IDLE_FRAME_MS,
   paintColumn,
+  paintGlow,
+  paintSheen,
   prefersReducedMotion,
   resample,
+  sheenAt,
+  SHEEN_PEAK,
 } from "./dither-paint"
+import { calmMotion, onMotionChange } from "./motion"
 import { rgb } from "./palette"
 import { scheduleCanvas, type CanvasScheduler } from "./canvas-scheduler"
 
@@ -29,9 +36,10 @@ type LoopArgs = {
 /**
  * On-demand painter — eases each series toward its target
  * surface, paints the dither fill (with the entrance reveal), then layers the
- * crosshair marker and static glints on top. Lives outside the component so the
- * component stays small and this hot closure isn't re-created on every render.
- * Returns a scheduler that pauses when idle, hidden, or outside the viewport.
+ * crosshair marker, glints and the living-light pass on top. Lives outside the
+ * component so the component stays small and this hot closure isn't re-created
+ * on every render. Returns a scheduler that pauses when idle, hidden, or
+ * outside the viewport.
  */
 function startCartesianLoop({
   canvas,
@@ -62,6 +70,15 @@ function startCartesianLoop({
     liftCtx.push(cx)
   }
 
+  // The crisp fill at the current lift, *without* the pointer overlays, light or
+  // glints. Each frame re-blits it (see the `copy` restore in `draw`) so the
+  // light pass repaints without re-dithering the surface.
+  const baseCanvas = document.createElement("canvas")
+  baseCanvas.width = cols
+  baseCanvas.height = rows
+  const baseCtx = baseCanvas.getContext("2d")
+  if (!baseCtx) return undefined
+
   // Bloom layer: a blurred, additive copy of the crisp canvas.
   const bloomCtx = bloomCanvas?.getContext("2d") ?? null
   if (bloomCanvas) {
@@ -76,6 +93,17 @@ function startCartesianLoop({
   // Hover fade length. Reduced motion jumps straight to the target.
   const FADE = reduce ? 0 : 340
   const current: Record<string, Surface> = {}
+
+  // Per-chart phase offset so neighbouring charts never sweep in lockstep.
+  const phase = (() => {
+    const key = state.current.configKeys[0]
+    const fill = key ? state.current.seedOf(key).fill : [7, 11, 13]
+    const v = fill[0] * 7 + fill[1] * 13 + fill[2] * 29
+    return (v % 97) / 97
+  })()
+
+  // Calm mode's still highlight (fixed position, no motion).
+  const STILL = { x: cols * 0.16, width: Math.max(22, cols * 0.34), peak: 0.06 }
 
   // `reveal` (0–1) sweeps the fill in left-to-right on first paint.
   const paintFill = (layer: number, reveal: number) => {
@@ -131,11 +159,36 @@ function startCartesianLoop({
   // Whether each cached layer matches the current surfaces / reveal / emphasis.
   const layerDirty = [true, true]
   let needsFill = true
+  let baseDirty = true
+  let bloomDirty = false
   let lastPaintSig = ""
   let lastSelected: string | null | undefined = Symbol() as never
   // The crosshair moves on almost every pointer event; tracking it separately
   // from the fill is what lets a hover redraw skip the dither repaint.
   let lastMarker: number | null | undefined = Symbol() as never
+  let glowX = -1
+  let glowY = -1
+
+  // Compose the current lift blend into the reusable base buffer.
+  const composeFill = () => {
+    baseCtx.clearRect(0, 0, cols, rows)
+    if (intensity <= 0) {
+      baseCtx.drawImage(liftCanvas[0], 0, 0)
+    } else if (intensity >= 1) {
+      baseCtx.drawImage(liftCanvas[1], 0, 0)
+    } else {
+      // Additive cross-blend: both layers share the same colour per series, so
+      // summing the premultiplied pixels gives an exact linear mix of the two
+      // weights (a plain source-over blend would dim the middle of the fade).
+      baseCtx.globalCompositeOperation = "lighter"
+      baseCtx.globalAlpha = 1 - intensity
+      baseCtx.drawImage(liftCanvas[0], 0, 0)
+      baseCtx.globalAlpha = intensity
+      baseCtx.drawImage(liftCanvas[1], 0, 0)
+      baseCtx.globalAlpha = 1
+      baseCtx.globalCompositeOperation = "source-over"
+    }
+  }
 
   const draw = (now: number, full: boolean) => {
     const s = state.current
@@ -205,7 +258,6 @@ function startCartesianLoop({
     const fade = FADE === 0 ? 1 : Math.min(1, (now - liftStart) / FADE)
     const settling = fade < 1
     intensity = liftFrom + (liftTarget - liftFrom) * easeInOutCubic(fade)
-    const liftChanged = intensity !== drawnIntensity
 
     // Live hover wins; the controlled markerIndex (e.g. a committed point)
     // is the fallback shown when nothing is hovered.
@@ -222,18 +274,19 @@ function startCartesianLoop({
       lastPaintSig = paintSig
       needsFill = true
     }
-    if (
-      !(
-        moving ||
-        settling ||
-        liftChanged ||
-        needsFill ||
-        progChanged ||
-        sigChanged ||
-        markerChanged
-      )
-    )
-      return
+
+    // Idle lighting: a slow sweep while the chart is visible and untouched, at
+    // the reduced cadence; a hovered chart drops back to every frame so the
+    // glow tracks the cursor. Reduced motion / a low battery gets the static
+    // lit look instead (painted with the fill, never animated).
+    const calm = calmMotion()
+    const hot = s.isMouseInChart || s.hovered
+    scheduler?.setFrameInterval(hot ? HOVER_FRAME_MS : IDLE_FRAME_MS)
+
+    const staticChanged =
+      moving || settling || needsFill || progChanged || sigChanged || markerChanged
+    if (!staticChanged && calm) return
+
     if (progChanged) {
       lastProg = prog
       needsFill = true
@@ -251,35 +304,110 @@ function startCartesianLoop({
     }
     // Paint only the layers the current blend needs, and only when stale.
     const needBoth = intensity > 0 && intensity < 1
+    let painted = false
     for (let layer = 0; layer < 2; layer++) {
       if (!layerDirty[layer]) continue
       if (!needBoth && layer !== (intensity >= 1 ? 1 : 0)) continue
       paintFill(layer, reveal)
       layerDirty[layer] = false
+      painted = true
     }
-    c.clearRect(0, 0, cols, rows)
-    if (intensity <= 0) {
-      c.drawImage(liftCanvas[0], 0, 0)
-    } else if (intensity >= 1) {
-      c.drawImage(liftCanvas[1], 0, 0)
-    } else {
-      // Additive cross-blend: both layers share the same colour per series, so
-      // summing the premultiplied pixels gives an exact linear mix of the two
-      // weights (a plain source-over blend would dim the middle of the fade).
-      c.globalCompositeOperation = "lighter"
-      c.globalAlpha = 1 - intensity
-      c.drawImage(liftCanvas[0], 0, 0)
-      c.globalAlpha = intensity
-      c.drawImage(liftCanvas[1], 0, 0)
-      c.globalAlpha = 1
-      c.globalCompositeOperation = "source-over"
+    if (painted || intensity !== drawnIntensity) baseDirty = true
+
+    const accent = (s.configKeys.length
+      ? s.seedOf(s.configKeys[0])
+      : s.seedOf("")
+    ).line
+
+    if (baseDirty) {
+      composeFill()
+      baseDirty = false
+      drawnIntensity = intensity
+      bloomDirty = true
     }
-    drawnIntensity = intensity
+
+    // Restore the crisp fill before layering this frame's light and overlays.
+    // `copy` replaces pixels *including* alpha, so nothing a previous frame
+    // drew (sweep, glow, crosshair, glints) can accumulate — and a single blit
+    // is cheaper than tracking every rect the previous frame touched.
+    c.globalCompositeOperation = "copy"
+    c.drawImage(baseCanvas, 0, 0)
+    c.globalCompositeOperation = "source-over"
+
+    // Calm mode keeps one soft, static highlight instead of the sweep.
+    if (calm) paintSheen(c, STILL, rows, accent)
 
     const mx =
       marker != null && s.dataLength > 1
         ? Math.round((marker / (s.dataLength - 1)) * (cols - 1))
         : -1
+
+    // ── Idle light: one soft band travelling across the fill ──────────────
+    if (!calm) {
+      const sheen = sheenAt(now, cols, phase)
+      paintSheen(c, sheen, rows, accent)
+      // Contour glint: where the band crosses, the value line lights up so the
+      // silhouette reads as a neon edge rather than a flat stroke.
+      const centre = sheen.x + sheen.width / 2
+      const half = sheen.width / 2
+      const from = Math.max(0, Math.floor(sheen.x))
+      const to = Math.min(cols - 1, Math.ceil(sheen.x + sheen.width))
+      const breathe = sheen.peak / SHEEN_PEAK
+      for (const key of s.configKeys) {
+        const cur = current[key]
+        if (!cur) continue
+        c.fillStyle = rgb(s.seedOf(key).line)
+        for (let x = from; x <= to; x++) {
+          const fall = 1 - Math.abs(x - centre) / half
+          if (fall <= 0.05) continue
+          const y = Math.round(cur.top[x] ?? 0)
+          if (y < 0 || y >= rows) continue
+          c.globalAlpha = 0.3 * fall * breathe
+          c.fillRect(x, y, 1, 1)
+        }
+      }
+      c.globalAlpha = 1
+    }
+
+    // ── Hover light: a soft radial glow riding the active point ───────────
+    if (intensity > 0.01 && mx >= 0 && mx <= cols - 1) {
+      // Ease the centre toward the new point; a fast scrub glides, a jump
+      // between distant points does not teleport. Calm mode snaps instead.
+      let targetY = rows * 0.5
+      for (const key of s.configKeys) {
+        const cur = current[key]
+        if (cur) {
+          targetY = cur.top[mx] ?? targetY
+          break
+        }
+      }
+      if (glowX < 0 || calm) {
+        glowX = mx
+        glowY = targetY
+      } else {
+        glowX += (mx - glowX) * 0.3
+        glowY += (targetY - glowY) * 0.3
+      }
+      const radius = Math.max(14, rows * 0.3)
+      paintGlow(c, glowX, glowY, radius, accent, 0.62 * intensity)
+      // Brighten the contour immediately around the cursor as well.
+      const spread = 9
+      for (const key of s.configKeys) {
+        const cur = current[key]
+        if (!cur) continue
+        c.fillStyle = rgb(s.seedOf(key).line)
+        for (let x = Math.max(0, mx - spread); x <= Math.min(cols - 1, mx + spread); x++) {
+          const y = Math.round(cur.top[x] ?? 0)
+          if (y < 0 || y >= rows) continue
+          c.globalAlpha = 0.55 * intensity * (1 - Math.abs(x - mx) / (spread + 1))
+          c.fillRect(x, y, 1, 1)
+        }
+      }
+      c.globalAlpha = 1
+    } else {
+      glowX = -1
+    }
+
     if (mx >= 0 && mx <= revealCols) {
       for (const key of s.configKeys) {
         const cur = current[key]
@@ -305,33 +433,43 @@ function startCartesianLoop({
       const top = cur.top[sx] ?? 0
       const floor = cur.floor[sx] ?? rows - 1
       const sy = Math.round(top + star.depth * (floor - top))
-      // Keep the texture's glints static so an idle chart needs no repaint.
-      const tw = reduce ? 0.85 : (Math.sin(star.phase * 0.35) + 1) / 2
+      // Slow twinkle while the light is running; steady glints in calm mode.
+      const tw = calm
+        ? 0.85
+        : (Math.sin(star.phase * 0.35 + now * 0.0012) + 1) / 2
       const lift = tw * (0.7 + 0.3 * intensity)
       if (lift < 0.55 || sy < 0 || sy >= rows) continue
       // Sparkles glint in the series colour via opacity
       // rather than a lighter shade — so they never read as stray white
       // pixels on a light background.
-      const starColor = s.seedOf(star.key).fill
-      c.fillStyle = rgb(starColor, 1, lift)
+      c.fillStyle = rgb(s.seedOf(star.key).fill)
+      c.globalAlpha = lift
       c.fillRect(sx, sy, 1, 1)
       // The brightest stars flare into a 4-point glint.
       if (tw > 0.9) {
-        c.fillStyle = rgb(starColor, 1, lift * 0.6 * (tw - 0.9) * 10)
+        c.globalAlpha = lift * 0.6 * (tw - 0.9) * 10
         c.fillRect(sx - 1, sy, 1, 1)
         c.fillRect(sx + 1, sy, 1, 1)
         c.fillRect(sx, sy - 1, 1, 1)
         c.fillRect(sx, sy + 1, 1, 1)
       }
     }
-    if (bloomCtx) {
-      bloomCtx.clearRect(0, 0, cols, rows)
-      if (s.bloom !== "off") bloomCtx.drawImage(canvas, 0, 0)
+    c.globalAlpha = 1
+
+    if (bloomDirty) {
+      bloomDirty = false
+      if (bloomCtx) {
+        bloomCtx.clearRect(0, 0, cols, rows)
+        if (s.bloom !== "off") bloomCtx.drawImage(canvas, 0, 0)
+      }
     }
-    return moving || settling || prog < 1
+    return moving || settling || prog < 1 || !calm
   }
 
-  return scheduleCanvas(canvas, draw)
+  // Declared after `draw` for readability; the callback only runs from an
+  // animation frame, so it is always initialized by the time `draw` reads it.
+  const scheduler = scheduleCanvas(canvas, draw)
+  return scheduler
 }
 
 /**
@@ -429,6 +567,13 @@ export function CartesianCanvas() {
     schedulerRef.current = scheduler
     return () => { scheduler?.dispose(); schedulerRef.current = undefined }
   }, [cols, rows])
+
+  // A reduced-motion / battery change switches the light between moving and
+  // static; repaint once with the new mode rather than restarting the loop.
+  useEffect(
+    () => onMotionChange(() => schedulerRef.current?.invalidate(true)),
+    []
+  )
 
   const bloomActive = ctx.bloomOnHover
     ? ctx.isMouseInChart || ctx.hovered

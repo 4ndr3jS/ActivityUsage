@@ -33,7 +33,8 @@ interface BucketReadResult {
 /** Read the local ActivityWatch API without exposing its HTTP surface to the renderer. */
 export async function readActivityWatchData(value: unknown): Promise<ActivityWatchSnapshot> {
   const range = validateRange(value);
-  const [start, end] = [Date.parse(range.start), Date.parse(range.end)];
+  const start = range.start === null ? null : Date.parse(range.start);
+  const end = Date.parse(range.end);
   const bucketPayload = await requestJson(`${ACTIVITYWATCH_API}/buckets/`);
   const rawBuckets = Array.isArray(bucketPayload)
     ? bucketPayload
@@ -54,15 +55,15 @@ export async function readActivityWatchData(value: unknown): Promise<ActivityWat
 }
 
 function validateRange(value: unknown): ActivityWatchRange {
-  if (!isRecord(value) || typeof value.start !== "string" || typeof value.end !== "string") {
+  if (!isRecord(value) || (value.start !== null && typeof value.start !== "string") || typeof value.end !== "string") {
     throw new Error("Choose a valid ActivityWatch date range.");
   }
-  const start = Date.parse(value.start);
+  const start = value.start === null ? null : Date.parse(value.start);
   const end = Date.parse(value.end);
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start || end - start > MAX_RANGE_MS) {
+  if (!Number.isFinite(end) || (start !== null && (!Number.isFinite(start) || end <= start || end - start > MAX_RANGE_MS))) {
     throw new Error("The ActivityWatch date range is invalid or too large.");
   }
-  return { start: new Date(start).toISOString(), end: new Date(end).toISOString(), includeBrowserTabs: value.includeBrowserTabs === true };
+  return { start: start === null ? null : new Date(start).toISOString(), end: new Date(end).toISOString(), includeBrowserTabs: value.includeBrowserTabs === true };
 }
 
 async function requestJson(url: string): Promise<unknown> {
@@ -84,14 +85,15 @@ function isTabBucket(bucket: RawBucket): boolean {
   return bucket.type === "web.tab.current";
 }
 
-async function readBucket(bucket: RawBucket, start: number, end: number, includeBrowserTabs: boolean): Promise<BucketReadResult> {
+async function readBucket(bucket: RawBucket, start: number | null, end: number, includeBrowserTabs: boolean): Promise<BucketReadResult> {
   const id = asString(bucket.id) ?? "";
   const device = bucketDevice(bucket);
   const type = asString(bucket.type) ?? "Unknown watcher";
   const hostname = asString(bucket.hostname) ?? id;
   const lastUpdated = asString(bucket.last_updated);
   const base: ActivityWatchBucket = { id, type, hostname, lastUpdated, device, eventCount: 0, error: null };
-  const query = new URLSearchParams({ start: new Date(start).toISOString(), end: new Date(end).toISOString(), limit: "-1" });
+  const query = new URLSearchParams({ end: new Date(end).toISOString() });
+  if (start !== null) query.set("start", new Date(start).toISOString());
 
   try {
     const payload = await requestJson(`${ACTIVITYWATCH_API}/buckets/${encodeURIComponent(id)}/events?${query.toString()}`);
@@ -124,14 +126,14 @@ function normalizeEvent(
   event: RawEvent,
   bucketId: string,
   device: ActivityDevice,
-  rangeStart: number,
+  rangeStart: number | null,
   rangeEnd: number
 ): ActivityWatchRecord | null {
   if (typeof event.timestamp !== "string") return null;
   const rawStart = Date.parse(event.timestamp);
   const duration = typeof event.duration === "number" ? event.duration : Number(event.duration);
   if (!Number.isFinite(rawStart) || !Number.isFinite(duration) || duration <= 0) return null;
-  const start = Math.max(rawStart, rangeStart);
+  const start = rangeStart === null ? rawStart : Math.max(rawStart, rangeStart);
   const end = Math.min(rawStart + duration * 1000, rangeEnd);
   if (end <= start) return null;
   const data = isRecord(event.data) ? event.data : {};

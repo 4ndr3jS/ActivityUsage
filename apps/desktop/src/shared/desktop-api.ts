@@ -6,7 +6,7 @@ export type AppRoute = "day" | "trends" | "insights" | "limits" | "alerts" | "pr
 export type EngineStatus = "starting" | "ready" | "degraded" | "stopped";
 
 export interface ActivityWatchRange {
-  start: string;
+  start: string | null;
   end: string;
   includeBrowserTabs?: boolean;
 }

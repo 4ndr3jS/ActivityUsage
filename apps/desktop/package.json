@@ -1,7 +1,7 @@
 {
   "name": "@activityusage/desktop",
   "private": true,
-  "version": "0.2.20",
+  "version": "0.2.23",
   "description": "Local-first desktop and Android activity analytics",
   "author": "Activity Usage contributors",
   "homepage": "https://usageatlas.com",

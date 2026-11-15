@@ -1,7 +1,7 @@
 import type { DashboardProvider } from "@activityusage/contracts";
 import { Button, Label, ListBox, Popover, Select, Tooltip } from "@heroui/react";
 import { useState } from "react";
-import type { AnalyticsRange, ProviderScope } from "../personal-analytics";
+import { formatPeriodLabel, shiftDay, todayDay, type AnalyticsRange, type ProviderScope } from "../personal-analytics";
 import {
   CalendarRangeIcon,
   CheckIcon,
@@ -23,18 +23,14 @@ interface TimeNavigatorProps {
   selectedRange?: AnalyticsRange;
   canMoveBack?: boolean;
   canMoveForward: boolean;
+  today?: string;
   onMoveBack(): void;
   onMoveForward(): void;
   onSelectDay(day: string): void;
   onSelectRange(range: AnalyticsRange): void;
 }
 
-const ranges: Array<{ value: AnalyticsRange; label: string }> = [
-  { value: 7, label: "Last 7 days" },
-  { value: 30, label: "Last 30 days" },
-  { value: 90, label: "Last 90 days" },
-  { value: "all", label: "All available" }
-];
+const ranges: AnalyticsRange[] = [7, 30, 90, "all"];
 
 export function TimeNavigator({
   backgroundActivity,
@@ -44,6 +40,7 @@ export function TimeNavigator({
   selectedRange,
   canMoveBack = true,
   canMoveForward,
+  today = todayDay(),
   onMoveBack,
   onMoveForward,
   onSelectDay,
@@ -51,8 +48,7 @@ export function TimeNavigator({
 }: TimeNavigatorProps): React.JSX.Element {
   const [isOpen, setOpen] = useState(false);
   const closeMenu = (): void => setOpen(false);
-  const today = todayValue();
-  const yesterday = shiftCalendarDay(today, -1);
+  const yesterday = shiftDay(today, -1);
 
   return (
     <div aria-label="Time period" className="atlas-toolbar-cluster" role="group">
@@ -63,12 +59,12 @@ export function TimeNavigator({
         <Tooltip.Content>{mode === "day" ? "Previous day" : "Previous period"}</Tooltip.Content>
       </Tooltip>
       <Popover isOpen={isOpen} onOpenChange={setOpen}>
-        <Button className="atlas-period-trigger min-w-40 justify-between" variant="secondary">
+        <Button className="atlas-period-trigger justify-between" variant="secondary">
           <span className="truncate">{label}</span>
           <ChevronDownIcon className="size-4 text-muted" />
         </Button>
-        <Popover.Content className="atlas-time-popover w-[min(28rem,calc(100vw-2rem))]" placement="bottom start">
-          <Popover.Dialog className="grid gap-5 p-3 sm:grid-cols-2">
+        <Popover.Content className="atlas-time-popover" offset={7} placement="bottom start">
+          <Popover.Dialog className="atlas-time-menu">
             <div className="atlas-time-menu-section">
               <Popover.Heading className="text-sm font-medium">Choose a day</Popover.Heading>
               <Button
@@ -98,14 +94,16 @@ export function TimeNavigator({
                 <input
                   className="atlas-time-date"
                   id="usage-day"
-                  max={todayValue()}
+                  max={today}
+                  defaultValue={mode === "day" ? selectedDay : today}
                   onChange={(event) => {
-                    if (!event.currentTarget.value) return;
-                    onSelectDay(event.currentTarget.value);
-                    closeMenu();
+                    const { valid } = event.currentTarget.validity;
+                    if (valid && event.currentTarget.value) onSelectDay(event.currentTarget.value);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && event.currentTarget.validity.valid && event.currentTarget.value) closeMenu();
                   }}
                   type="date"
-                  value={mode === "day" ? selectedDay : ""}
                 />
               </div>
             </div>
@@ -113,21 +111,21 @@ export function TimeNavigator({
               <p className="text-sm font-medium">Choose a range</p>
               {ranges.map((range) => (
                 <Button
-                  aria-pressed={mode === "range" && selectedRange === range.value}
+                  aria-pressed={mode === "range" && selectedRange === range}
                   className="atlas-time-option atlas-time-option--range"
                   fullWidth
-                  key={range.value}
-                  onPress={() => { onSelectRange(range.value); closeMenu(); }}
-                  variant={mode === "range" && selectedRange === range.value ? "secondary" : "ghost"}
+                  key={range}
+                  onPress={() => { onSelectRange(range); closeMenu(); }}
+                  variant={mode === "range" && selectedRange === range ? "secondary" : "ghost"}
                 >
-                  {range.value === "all"
+                  {range === "all"
                     ? <TrendsIcon className="atlas-time-option__icon" />
                     : <CalendarRangeIcon className="atlas-time-option__icon" />}
                   <span className="flex min-w-0 flex-1 flex-col items-start">
-                    <span>{range.label}</span>
-                    <span className="text-xs font-normal text-muted">{range.value === "all" ? "Full collected history" : "View trends"}</span>
+                    <span>{formatPeriodLabel(range)}</span>
+                    <span className="text-xs font-normal text-muted">{range === "all" ? "Full collected history" : "View trends"}</span>
                   </span>
-                  {mode === "range" && selectedRange === range.value ? <CheckIcon className="atlas-time-option__check" /> : null}
+                  {mode === "range" && selectedRange === range ? <CheckIcon className="atlas-time-option__check" /> : null}
                 </Button>
               ))}
             </div>
@@ -199,21 +197,4 @@ export function ProviderScopeSelect({
       </Select.Popover>
     </Select>
   );
-}
-
-function todayValue(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function shiftCalendarDay(day: string, offset: number): string {
-  const date = new Date(`${day}T12:00:00`);
-  date.setDate(date.getDate() + offset);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const value = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${value}`;
 }

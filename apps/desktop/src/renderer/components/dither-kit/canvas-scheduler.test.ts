@@ -14,6 +14,12 @@ describe("canvas scheduling", () => {
     pending.forEach(callback => callback(100));
   }
 
+  function tickAt(now: number): void {
+    const pending = [...frames.values()];
+    frames.clear();
+    pending.forEach(callback => callback(now));
+  }
+
   beforeEach(() => {
     frames = new Map();
     nextFrame = 0;
@@ -79,6 +85,32 @@ describe("canvas scheduling", () => {
     tick();
     expect(draw.mock.calls.map(call => call[1])).toEqual([true, false, true]);
     scheduler.dispose();
+  });
+
+  it("throttles a continuous animation to the requested cadence", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const draw = vi.fn().mockReturnValue(true);
+      const scheduler = scheduleCanvas({} as HTMLCanvasElement, draw);
+      scheduler.setFrameInterval(40);
+      intersect(true);
+      tickAt(0);
+      expect(draw).toHaveBeenCalledTimes(1);
+      tickAt(16);
+      expect(draw).toHaveBeenCalledTimes(1);
+      // A throttled animation must not re-arm the display callback; it sleeps
+      // until the next paint is due, so a 180Hz panel is not hammered.
+      expect(frames.size).toBe(0);
+      vi.advanceTimersByTime(40);
+      tickAt(48);
+      expect(draw).toHaveBeenCalledTimes(2);
+      scheduler.invalidate(false);
+      tickAt(49);
+      expect(draw).toHaveBeenCalledTimes(3);
+      scheduler.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("pauses offscreen and while hidden, resumes with current data, and cancels on disposal", () => {

@@ -3,7 +3,7 @@
 // chart type reads with the exact same pixel texture.
 
 import type { AreaVariant } from "./chart-context"
-import { rgb, type Seed } from "./palette"
+import { rgb, type Rgb, type Seed } from "./palette"
 
 // 4×4 ordered (Bayer) matrix, normalized to 0–1 thresholds — the exact matrix
 // the legacy chart dithers with.
@@ -178,4 +178,83 @@ export function prefersReducedMotion() {
   return (
     window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false
   )
+}
+
+// ── Living light ────────────────────────────────────────────────────────────
+//
+// The idle shimmer never re-dithers. A cached copy of the crisp fill is
+// re-blitted with `copy` each frame (one cheap canvas blit), then two tiny
+// `source-atop` gradients ride on top: the light is clipped by the fill's own
+// alpha, so only existing dots brighten and the dotted texture survives intact.
+// At ~24fps that is a few thousand pixels per chart per frame — cheaper than
+// one full-blur bloom pass.
+
+/** Idle repaint cadence (~15fps). A 15-second sweep advances well under 1% of
+ * the width per frame, so the band still reads as continuous motion while the
+ * window composites 40% fewer frames than a 24fps loop would ask for. */
+export const IDLE_FRAME_MS = 1000 / 15
+
+/** Interaction cadence. Displays run at 120–240Hz, but pointer light only needs
+ * 60fps to feel attached to the cursor — and that is a third of the paint cost
+ * of a high-refresh panel. */
+export const HOVER_FRAME_MS = 1000 / 60
+
+export type SheenSample = { x: number; width: number; peak: number }
+
+/** Brightness of the sweep's core. Tuned to read clearly on the dark glass
+ * cards without turning into a spotlight. */
+export const SHEEN_PEAK = 0.16
+
+/** Where the travelling highlight is at `now`. The band starts and finishes
+ * fully off-canvas, so the repeat is seamless rather than a visible jump. */
+export function sheenAt(now: number, cols: number, phase: number): SheenSample {
+  const period = 15000
+  const width = Math.max(22, cols * 0.34)
+  const travel = cols + width * 2
+  const t = (((now / period + phase) % 1) + 1) % 1
+  // Slow "breathing" on top of the sweep so the light never pulses metronomically.
+  const breathe =
+    0.78 + 0.22 * Math.sin((now / 5600) * Math.PI * 2 + phase * Math.PI * 2)
+  return { x: -width + t * travel, width, peak: SHEEN_PEAK * breathe }
+}
+
+/** Soft travelling highlight, masked by the destination's alpha. */
+export function paintSheen(
+  ctx: CanvasRenderingContext2D,
+  sample: SheenSample,
+  rows: number,
+  color: Rgb
+) {
+  const { x, width, peak } = sample
+  if (peak <= 0.001) return
+  const gradient = ctx.createLinearGradient(x, 0, x + width, 0)
+  gradient.addColorStop(0, rgb(color, 1, 0))
+  gradient.addColorStop(0.36, rgb(color, 1, peak * 0.42))
+  gradient.addColorStop(0.5, rgb(color, 1, peak))
+  gradient.addColorStop(0.64, rgb(color, 1, peak * 0.42))
+  gradient.addColorStop(1, rgb(color, 1, 0))
+  ctx.globalCompositeOperation = "source-atop"
+  ctx.fillStyle = gradient
+  ctx.fillRect(x, 0, width, rows)
+  ctx.globalCompositeOperation = "source-over"
+}
+
+/** Localized radial illumination around the hovered point, also alpha-masked. */
+export function paintGlow(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  radius: number,
+  color: Rgb,
+  strength: number
+) {
+  if (strength <= 0.004 || radius <= 0) return
+  const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius)
+  gradient.addColorStop(0, rgb(color, 1, strength))
+  gradient.addColorStop(0.42, rgb(color, 1, strength * 0.5))
+  gradient.addColorStop(1, rgb(color, 1, 0))
+  ctx.globalCompositeOperation = "source-atop"
+  ctx.fillStyle = gradient
+  ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2)
+  ctx.globalCompositeOperation = "source-over"
 }
