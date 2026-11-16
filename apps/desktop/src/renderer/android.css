@@ -1,0 +1,266 @@
+/* Native system insets surround this viewport. Keep phone rules off desktop. */
+:root[data-platform="android"] {
+  --font-sans: Roboto, "Noto Sans", system-ui, sans-serif;
+  --atlas-glass-filter: none;
+  --android-bar: #f3f5fb;
+  --android-card: rgb(255 255 255 / 82%);
+  --android-selected: #d9e5ff;
+  --android-selected-text: #193b75;
+  --android-secondary: #566176;
+  min-width: 0;
+  border-radius: 0;
+
+  body, #root { min-width: 0; border-radius: 0; }
+  button, select, input, summary { -webkit-tap-highlight-color: transparent; }
+  button { touch-action: manipulation; }
+  button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid #629efa; outline-offset: 2px; }
+
+  .android-shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 0;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+  .android-app-bar {
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 56px;
+    gap: 8px;
+    padding-inline: 16px 8px;
+    background: var(--android-bar);
+  }
+  .android-app-brand { display: flex; align-items: center; min-width: 0; gap: 10px; }
+  .android-app-brand img { width: 28px; height: 28px; border-radius: 8px; }
+  .android-app-brand span { font-size: 15px; font-weight: 650; line-height: 1.3; }
+  .android-app-bar nav { display: flex; flex-shrink: 0; }
+  .android-app-bar .atlas-app-shell__rail-button { width: 48px; height: 48px; border-radius: 16px; }
+  .android-app-bar .atlas-app-shell__rail-icon,
+  .android-app-bar .atlas-app-shell__rail-icon svg { width: 22px; height: 22px; }
+  .android-app-bar .atlas-app-shell__rail-button[aria-current="page"] { color: var(--android-selected-text); background: var(--android-selected); box-shadow: none; }
+  .atlas-app-shell__workspace { grid-column: 1; grid-row: 2; }
+  .android-bottom-navigation {
+    grid-row: 3;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    padding: 8px 8px 6px;
+    border-top: 1px solid var(--atlas-edge);
+    background: var(--android-bar);
+  }
+  .android-bottom-navigation button {
+    display: flex;
+    min-width: 0;
+    min-height: 58px;
+    align-items: center;
+    flex-direction: column;
+    gap: 4px;
+    color: var(--android-secondary);
+    font-size: 11px;
+    line-height: 1.3;
+    font-weight: 550;
+    border-radius: 16px;
+  }
+  .android-navigation-icon { display: grid; place-items: center; width: 56px; height: 30px; border-radius: 18px; }
+  .android-navigation-icon svg { width: 22px; height: 22px; }
+  .android-bottom-navigation [aria-current="page"] { color: var(--foreground); font-weight: 650; }
+  .android-bottom-navigation [aria-current="page"] .android-navigation-icon { color: var(--android-selected-text); background: var(--android-selected); }
+
+  .activity-dashboard {
+    --activity-secondary: var(--android-secondary);
+    --activity-tertiary: var(--android-secondary);
+    gap: 12px;
+    padding: 16px 16px 28px;
+  }
+  .activity-dashboard h1 { font-size: 26px; line-height: 1.2; letter-spacing: -.025em; overflow-wrap: anywhere; }
+  .activity-dashboard h2 { font-size: 20px; line-height: 1.3; }
+  .activity-dashboard h3 { font-size: 15px; line-height: 1.4; }
+  .activity-dashboard__heading { order: -1; gap: 10px; padding: 4px 0 8px; }
+  .activity-dashboard .activity-dashboard__subtitle { margin-top: 6px; font-size: 13px; }
+  .activity-live-pill { font-size: 11px; white-space: normal; }
+  .activity-dashboard > .activity-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin: 0 0 4px; }
+  .activity-period-controls { grid-column: 1 / -1; margin: 0; padding: 0; width: 100%; }
+  .activity-period-controls .atlas-toolbar-cluster { display: grid; width: 100%; grid-template-columns: 48px minmax(0, 1fr) 48px; gap: 8px; }
+  :is(.activity-period-controls, .activity-statistics__filter) .atlas-period-trigger { width: 100%; min-width: 0; min-height: 48px; border-radius: 16px; font-size: 14px; }
+  .activity-period-controls .atlas-toolbar-icon { width: 48px; min-width: 48px; height: 48px; border-radius: 16px; }
+  .activity-select-label { order: 0; min-width: 0; gap: 0; }
+  .activity-select-label select { min-width: 0; width: 100%; }
+  .activity-dashboard select { min-height: 48px; height: auto; max-width: 100%; border-radius: 16px; font-size: 14px; }
+  .android-options-trigger { min-height: 48px; padding-inline: 16px; border-radius: 16px; gap: 10px; font-size: 14px; }
+  .android-options-trigger svg { width: 16px; height: 16px; }
+  .activity-button, .activity-icon-button { height: auto; min-height: 48px; font-size: 13px; border-radius: 16px; }
+  .activity-button { padding: 10px 16px; white-space: normal; }
+  .activity-switch { min-height: 48px; font-size: 13px; }
+  .activity-switch input, .activity-preference input { width: 42px; height: 26px; margin: 0; }
+  .activity-switch input::after, .activity-preference input::after { width: 20px; height: 20px; }
+  .activity-switch input:checked::after, .activity-preference input:checked::after { transform: translateX(16px); }
+
+  /* Menus are portalled outside the dashboard, but still need phone spacing. */
+  .atlas-time-popover, .android-options-popover {
+    width: min(360px, calc(100vw - 32px));
+    max-height: min(620px, calc(100dvh - 32px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-radius: 24px;
+    background: var(--android-bar);
+    color: var(--foreground);
+  }
+  .atlas-time-menu { grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 16px; }
+  .atlas-time-menu-section { gap: 6px; }
+  .atlas-time-option { min-height: 48px; height: auto; border-radius: 14px; font-size: 14px; }
+  .atlas-time-option--range { min-height: 52px; }
+  .atlas-time-date { min-width: 0; min-height: 48px; font-size: 16px; }
+  .android-options-menu { display: grid; gap: 6px; padding: 16px; }
+  .android-options-menu > :first-child { font-size: 16px; font-weight: 650; padding: 4px 4px 8px; }
+  .android-options-menu .activity-switch { justify-content: space-between; gap: 16px; }
+  .android-options-menu button { justify-content: flex-start; min-height: 48px; border-radius: 14px; font-size: 14px; }
+  .android-options-menu button svg { width: 20px; height: 20px; }
+
+  .activity-glass-card { border-radius: 22px; background: var(--atlas-glass-sheen), var(--android-card); box-shadow: none; }
+  .activity-chart-panel, .activity-device-breakdown, .activity-app-list,
+  .activity-source-card, .activity-privacy-card, .activity-stat-card { padding: 18px 16px; }
+  .activity-hero-grid, .activity-chart-grid, .activity-settings-grid,
+  .activity-source-grid, .activity-statistics__charts, .activity-statistics__details { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .activity-hero { min-height: 0; padding: 22px 20px; }
+  .activity-hero h1 { font-size: 25px; }
+  .activity-hero-metric { margin-top: 20px; gap: 8px; }
+  .activity-hero-metric > strong { font-size: 46px; }
+  .activity-hero .activity-hero-context { font-size: 12px; line-height: 1.5; }
+  .activity-hero-devices { margin-top: 18px; font-size: 12px; }
+  .activity-metric-grid, .activity-metric-grid--compact, .activity-insight-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .activity-metric-card { display: grid; align-content: start; min-height: 0; padding: 16px; gap: 12px; }
+  .activity-metric-card:has(.activity-spark) { grid-template-rows: 1fr auto; align-content: stretch; }
+  .activity-metric-grid--compact .activity-metric-card { min-height: 0; }
+  .activity-metric-grid--compact > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .activity-metric-copy { gap: 8px; }
+  .activity-metric-copy > strong { font-size: 25px; white-space: normal; overflow-wrap: anywhere; }
+  .activity-metric-copy > span { font-size: 12px; line-height: 1.4; }
+  .activity-metric-copy > small { font-size: 11px; line-height: 1.5; }
+  .activity-spark { width: 100%; max-width: none; height: 36px; margin: 0; }
+  .activity-section-heading { padding-top: 14px; gap: 6px; }
+  .activity-section-heading > span { text-align: left; font-size: 12px; }
+  .activity-chart-panel__header, .activity-stat-card__heading { flex-wrap: wrap; align-items: flex-start; gap: 8px 12px; }
+  .activity-chart-panel__header > div, .activity-stat-card__heading > div { min-width: 0; flex: 1 1 170px; }
+  .activity-chart-panel__header > strong, .activity-stat-card__heading > strong { font-size: 18px; line-height: 1.4; white-space: nowrap; }
+  .activity-chart-panel__header p, .activity-stat-card__heading p { font-size: 12px; line-height: 1.5; }
+  .activity-chart-plot { height: 220px; margin-top: 14px; touch-action: pan-y; }
+  .activity-statistics .activity-stat-timeline { height: 220px; }
+  .activity-chart-empty { padding: 16px; text-align: center; }
+  .activity-chart-empty small { font-size: 12px; line-height: 1.5; }
+  .activity-chart-values { margin-top: 4px; font-size: 12px; }
+  .activity-chart-values summary { min-height: 44px; align-content: center; max-width: 100%; }
+  .activity-chart-values > div { max-width: 100%; }
+  .dither-tooltip { width: min(280px, 100%); max-width: 100%; padding: 10px 12px; border-radius: 14px; background: var(--android-bar); }
+  .dither-tooltip .whitespace-nowrap { white-space: normal; align-items: baseline; font-size: 12px; }
+  .dither-tooltip .whitespace-nowrap > span:nth-child(2) { min-width: 0; overflow-wrap: anywhere; }
+  .dither-tooltip .whitespace-nowrap > span:last-child { white-space: nowrap; flex-shrink: 0; }
+
+  .activity-device-mix { display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 16px; padding-block: 18px; }
+  .activity-donut { width: 128px; height: 128px; }
+  .activity-donut.is-empty::before { border-width: 16px; }
+  .activity-donut-center strong { font-size: 15px; }
+  .activity-donut-center span { font-size: 9px; }
+  .activity-device-legend { gap: 16px; }
+  .activity-device-row { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 4px 8px; }
+  .activity-device-icon, .activity-device-icon svg { width: 22px; height: 22px; }
+  .activity-device-row strong { font-size: 13px; }
+  .activity-device-row small { font-size: 11px; line-height: 1.4; }
+  .activity-device-row b { grid-column: 2; margin: 0; font-size: 14px; }
+  .activity-mix-context { display: grid; gap: 10px; }
+  .activity-mix-context > span { justify-content: space-between; gap: 16px; font-size: 12px; }
+  .activity-mix-context b { white-space: nowrap; }
+  .activity-app-list ol { margin-top: 18px; gap: 20px; }
+  .activity-app-list li { gap: 10px; }
+  .activity-app-row { font-size: 14px; gap: 12px; }
+  .activity-app-row span { white-space: normal; overflow-wrap: anywhere; }
+  .activity-app-row b { flex-shrink: 0; font-size: 13px; }
+  .activity-app-rank, .activity-app-detail > small { font-size: 11px; }
+  .activity-app-track { height: 5px; margin-block: 10px 5px; }
+
+  .activity-statistics { gap: 12px; }
+  .activity-statistics__detail-heading { align-items: stretch; flex-direction: column; gap: 12px; margin: 12px 0 0; }
+  .activity-statistics__filter { display: grid; gap: 8px; }
+  .activity-stat-mix__center strong { font-size: 18px; }
+  .activity-stat-mix__center small { font-size: 10px; }
+  .activity-donut-center strong { max-width: 65%; text-align: center; overflow-wrap: anywhere; line-height: 1.15; }
+  .activity-stat-mix__center strong { line-height: 1.15; }
+  .activity-stat-mix__legend { font-size: 12px; gap: 4px; }
+  .activity-stat-mix__legend button { min-height: 46px; }
+  .activity-stat-tree__row { grid-template-columns: 44px minmax(0, 1fr); }
+  .activity-stat-tree__select { min-height: 48px; font-size: 13px; gap: 6px; }
+  .activity-stat-tree .activity-stat-tree { margin-left: 10px; }
+  .activity-stat-tree__name { white-space: normal; overflow-wrap: anywhere; }
+  .activity-stat-rank { gap: 20px; }
+  .activity-stat-rank__entry { font-size: 14px; gap: 12px; }
+  button.activity-stat-rank__entry { min-height: 44px; }
+  .activity-stat-rank strong { flex: none; font-size: 13px; }
+  .activity-stat-card__action { min-height: 44px; padding: 10px 14px; border-radius: 14px; font-size: 12px; }
+
+  .activity-source-card__top { flex-wrap: wrap; gap: 12px; }
+  .activity-source-tag { font-size: 13px; }
+  .activity-source-state { font-size: 11px; }
+  .activity-source-card h3 { margin-block: 18px; font-size: 19px; }
+  .activity-source-card dl { gap: 16px; }
+  .activity-source-card dl > div { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 12px; font-size: 13px; }
+  .activity-source-card dl > div:first-child { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .activity-source-card dl > div:first-child dd { text-align: left; font-size: 12px; }
+  .activity-preference { gap: 16px; padding-block: 18px; }
+  .activity-preference > span { min-width: 0; gap: 6px; }
+  .activity-preference strong { font-size: 14px; line-height: 1.4; }
+  .activity-preference small { font-size: 12px; }
+  .activity-timezone-row { flex-wrap: wrap; font-size: 13px; gap: 8px; }
+  .activity-timezone-row strong { min-width: 0; text-align: start; }
+  .activity-dashboard .activity-privacy-note, .activity-dashboard .activity-explainer { font-size: 13px; line-height: 1.6; }
+  .activity-error, .activity-loading, .activity-empty { padding: 18px; font-size: 13px; line-height: 1.5; }
+  .activity-error > span { flex-basis: 100%; overflow-wrap: anywhere; }
+  .activity-error button { min-height: 48px; }
+  .activity-dashboard > .activity-notice { right: 16px; left: 16px; bottom: 88px; width: auto; max-width: none; gap: 12px; background: var(--android-bar); }
+  .activity-notice span { min-width: 0; overflow-wrap: anywhere; }
+  .activity-notice button { min-width: 44px; min-height: 44px; margin-left: auto; }
+  .activity-dashboard__footer { gap: 8px; font-size: 11px; padding-top: 12px; }
+  .android-connect-card { padding: 24px 20px; }
+  .android-connect-card p { margin-block: 16px 24px; color: var(--activity-secondary); font-size: 14px; line-height: 1.6; }
+  .android-connect-card > div { display: grid; gap: 10px; }
+  .android-reconnect { margin-top: 12px; }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-platform="android"] {
+    --android-bar: #0c0f19;
+    --android-card: rgb(16 24 46 / 88%);
+    --android-selected: #263d66;
+    --android-selected-text: #d5e4ff;
+    --android-secondary: #b3bed4;
+    --atlas-glass-sheen: linear-gradient(145deg, rgb(255 255 255 / 6%), transparent 65%);
+  }
+}
+
+@media (min-width: 600px) {
+  :root[data-platform="android"] {
+    .activity-dashboard { padding-inline: 24px; }
+    .activity-hero-grid, .activity-chart-grid, .activity-settings-grid,
+    .activity-statistics__charts, .activity-statistics__details { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .activity-statistics__details > :first-child { grid-column: 1 / -1; }
+    .activity-dashboard > .activity-toolbar { grid-template-columns: minmax(0, 1fr) minmax(120px, 180px) auto; }
+    .activity-period-controls { grid-column: auto; }
+    .activity-metric-grid--compact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .activity-metric-grid--compact > :last-child:nth-child(odd) { grid-column: auto; }
+    .android-bottom-navigation { padding-inline: max(8px, calc((100vw - 600px) / 2)); }
+  }
+}
+
+@media (max-width: 350px) {
+  :root[data-platform="android"] {
+    .activity-dashboard { padding-inline: 12px; }
+    .activity-metric-grid, .activity-metric-grid--compact, .activity-insight-grid { grid-template-columns: minmax(0, 1fr); }
+    .activity-device-mix { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+    .activity-donut { justify-self: center; }
+    .activity-device-legend { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .android-app-bar { padding-inline-start: 12px; gap: 4px; }
+    .android-app-brand { gap: 6px; }
+    .android-app-brand span { font-size: 14px; }
+  }
+}

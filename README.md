@@ -6,7 +6,7 @@
 
 <p align="center">
   Private device-activity analytics for your computer and Android phone.<br>
-  Activity data stays on your computer.
+  The dashboard reads activity data on the device where it runs.
 </p>
 
 ## What it does
@@ -29,7 +29,7 @@ Totals are calculated from the intervals ActivityWatch records. Combined time co
 
 ## Privacy
 
-Activity records are read locally and are not uploaded. Window titles are hidden by default and can be shown under **Statistics → Top window titles**. Exported summaries omit app labels unless you enable them and do not include visited pages.
+Activity records are read locally. If you enable the optional desktop sync below, the history file is sent to your paired phone through your chosen sync tool. Window titles are hidden by default and can be shown under **Statistics → Top window titles**. Exported summaries omit app labels unless you enable them and do not include visited pages.
 
 ## Build
 
@@ -43,6 +43,21 @@ bun run desktop:start
 ```
 
 For everyday use on Windows, build once with `bun run desktop:package`, then open `apps/desktop/out/ActivityUsage-win32-x64/ActivityUsage.exe`. Rebuild after changing the source. Create a platform installer with `bun run desktop:make`.
+
+### Android
+
+On Windows, use JDK 21, Android platform 36 and Build Tools 36 to build the Android app.
+
+```powershell
+.\apps\android\Build.ps1
+adb -s DEVICE_SERIAL install -r .\apps\android\out\ActivityUsage.apk
+```
+
+The script uses `ANDROID_HOME` and `JAVA_HOME` by default. Keep the generated `apps/android/out/local.keystore` for in-place updates.
+
+Open ActivityWatch on the phone and copy its key from **API Authentication**. In Activity Usage, select **Connect** and paste the key for access to local phone activity.
+
+For combined history on Android, first arrange for ActivityWatch phone records to be imported on the PC. Run `bun tooling/export-activity-mirror.ts <private-sync-folder>` on the PC after imports, for example every few minutes using the same local import job. Share this separate folder with just the phone in Syncthing, using Send Only on the PC, Receive Only on Android, and no file versioning. The folder contains a compressed copy of your recorded activity, including window titles, browser details and category rules. Keep it outside the repository. In Android Activity Usage, open **Settings → Desktop sync** and choose the received folder. The app reads the most recent copy while offline and shows when the PC last exported it.
 
 ## Credits
 

@@ -29,6 +29,10 @@ export function Tooltip({
 }) {
   const chart = useCommonChart()
   const show = chart.ready && chart.hoverIndex != null
+  const android = typeof window !== "undefined" && Boolean(window.ActivityUsageAndroid)
+  const tooltipLeft = android ? "50%" : chart.tooltipLeft
+  const tooltipTop = android ? 0 : chart.tooltipTop
+  const tooltipOffset = android ? "0%" : "-115%"
 
   // Retain the last hovered index so the card keeps its content while fading
   // out — adjust-state-during-render (no refs in render).
@@ -49,16 +53,16 @@ export function Tooltip({
           initial={{
             opacity: 0,
             x: "-50%",
-            y: "-115%",
-            top: chart.tooltipTop,
-            left: chart.tooltipLeft,
+            y: tooltipOffset,
+            top: tooltipTop,
+            left: tooltipLeft,
           }}
           animate={{
             opacity: 1,
             x: "-50%",
-            y: "-115%",
-            top: chart.tooltipTop,
-            left: chart.tooltipLeft,
+            y: tooltipOffset,
+            top: tooltipTop,
+            left: tooltipLeft,
           }}
           exit={{ opacity: 0 }}
           transition={{
@@ -68,7 +72,7 @@ export function Tooltip({
             mass: 0.6,
           }}
           className={cn(
-            "pointer-events-none absolute z-10 w-max rounded-md border px-2 py-1 shadow-sm",
+            "dither-tooltip pointer-events-none absolute z-10 w-max rounded-md border px-2 py-1 shadow-sm",
             VARIANT[variant]
           )}
         >

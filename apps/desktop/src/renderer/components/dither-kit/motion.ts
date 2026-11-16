@@ -2,7 +2,8 @@
 //
 // The answer is cached at module scope so a canvas can ask on every frame
 // without touching `matchMedia`, and every canvas is told when it flips, so a
-// chart can repaint once and then settle into its static lit look. Two inputs:
+// chart can repaint once and then settle into its static lit look. Android
+// keeps this static look to avoid continuous canvas rendering on the phone.
 //
 //   * `prefers-reduced-motion` — the OS accessibility switch.
 //   * the Battery Status API — only a genuinely low, unplugged battery calms
@@ -17,6 +18,7 @@ type BatteryLike = {
 
 let reduced = false
 let lowPower = false
+let mobile = false
 let started = false
 const listeners = new Set<() => void>()
 
@@ -28,6 +30,8 @@ function notify() {
 function start() {
   if (started || typeof window === "undefined") return
   started = true
+  mobile = document.documentElement.dataset.platform === "android"
+  if (mobile) return
 
   const media = window.matchMedia?.("(prefers-reduced-motion: reduce)")
   if (media) {
@@ -61,7 +65,7 @@ function start() {
 /** True when decoration should hold still and the chart keeps a static glow. */
 export function calmMotion(): boolean {
   start()
-  return reduced || lowPower
+  return mobile || reduced || lowPower
 }
 
 /** Notifies once whenever {@link calmMotion} may have changed. */

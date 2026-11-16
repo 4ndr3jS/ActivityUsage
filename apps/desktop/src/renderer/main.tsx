@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import "@fontsource-variable/inter";
 import "./globals.css";
 import { App } from "./App";
+import { installAndroidAPI } from "./android-api";
+import "./android.css";
 
 // Keep the component and glass themes aligned with the OS appearance.
 const systemDark = matchMedia("(prefers-color-scheme: dark)");
@@ -21,6 +23,7 @@ applySystemTheme();
 systemDark.addEventListener("change", applySystemTheme);
 
 // The title bar insets differ: traffic lights sit left on macOS, caption buttons right elsewhere.
+if (window.ActivityUsageAndroid) installAndroidAPI(window.ActivityUsageAndroid);
 document.documentElement.dataset.platform = window.usageAtlas.platform;
 
 const root = document.getElementById("root");

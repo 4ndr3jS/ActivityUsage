@@ -6,8 +6,8 @@ import type {
   ActivityWatchRecord,
   ActivityWatchSnapshot,
   ActivityWatchTab
-} from "../shared/desktop-api";
-import { pageAddress } from "../shared/browser-page";
+} from "./desktop-api";
+import { pageAddress } from "./browser-page";
 
 const ACTIVITYWATCH_API = "http://127.0.0.1:5600/api/0";
 const MAX_RANGE_MS = 366 * 24 * 60 * 60 * 1000;
@@ -31,12 +31,11 @@ interface BucketReadResult {
   tabs: ActivityWatchTab[];
 }
 
-/** Read the local ActivityWatch API without exposing its HTTP surface to the renderer. */
-export async function readActivityWatchData(value: unknown): Promise<ActivityWatchSnapshot> {
+export async function readActivityWatchData(value: unknown, api = ACTIVITYWATCH_API): Promise<ActivityWatchSnapshot> {
   const range = validateRange(value);
   const start = range.start === null ? null : Date.parse(range.start);
   const end = Date.parse(range.end);
-  const bucketPayload = await requestJson(`${ACTIVITYWATCH_API}/buckets/`);
+  const bucketPayload = await requestJson(`${api}/buckets/`);
   const rawBuckets = Array.isArray(bucketPayload)
     ? bucketPayload
     : isRecord(bucketPayload)
@@ -44,7 +43,7 @@ export async function readActivityWatchData(value: unknown): Promise<ActivityWat
       : [];
   const buckets = rawBuckets.filter(isRecord).map(bucket => bucket as RawBucket).filter(bucket => typeof bucket.id === "string");
   const sources = buckets.filter(bucket => isTrackedBucket(bucket) || (range.includeBrowserTabs && isTabBucket(bucket)));
-  const results = await Promise.all(sources.map(bucket => readBucket(bucket, start, end, range.includeBrowserTabs === true)));
+  const results = await Promise.all(sources.map(bucket => readBucket(api, bucket, start, end, range.includeBrowserTabs === true)));
 
   return {
     connected: true,
@@ -55,7 +54,7 @@ export async function readActivityWatchData(value: unknown): Promise<ActivityWat
   };
 }
 
-function validateRange(value: unknown): ActivityWatchRange {
+export function validateRange(value: unknown): ActivityWatchRange {
   if (!isRecord(value) || (value.start !== null && typeof value.start !== "string") || typeof value.end !== "string") {
     throw new Error("Choose a valid ActivityWatch date range.");
   }
@@ -67,9 +66,9 @@ function validateRange(value: unknown): ActivityWatchRange {
   return { start: start === null ? null : new Date(start).toISOString(), end: new Date(end).toISOString(), includeBrowserTabs: value.includeBrowserTabs === true };
 }
 
-export async function readActivityWatchCategories(): Promise<ActivityWatchCategory[]> {
+export async function readActivityWatchCategories(api = ACTIVITYWATCH_API): Promise<ActivityWatchCategory[]> {
   // ActivityWatch stores the merged active rule sets in the classes setting.
-  const payload = await requestJson(`${ACTIVITYWATCH_API}/settings/classes`);
+  const payload = await requestJson(`${api}/settings/classes`);
   if (!Array.isArray(payload)) return [];
   return payload.flatMap((value): ActivityWatchCategory[] => {
     if (!isRecord(value) || !Array.isArray(value.name)) return [];
@@ -114,7 +113,7 @@ function isTabBucket(bucket: RawBucket): boolean {
   return bucket.type === "web.tab.current";
 }
 
-async function readBucket(bucket: RawBucket, start: number | null, end: number, includeBrowserTabs: boolean): Promise<BucketReadResult> {
+async function readBucket(api: string, bucket: RawBucket, start: number | null, end: number, includeBrowserTabs: boolean): Promise<BucketReadResult> {
   const id = asString(bucket.id) ?? "";
   const device = bucketDevice(bucket);
   const type = asString(bucket.type) ?? "Unknown watcher";
@@ -125,7 +124,7 @@ async function readBucket(bucket: RawBucket, start: number | null, end: number, 
   if (start !== null) query.set("start", new Date(start).toISOString());
 
   try {
-    const payload = await requestJson(`${ACTIVITYWATCH_API}/buckets/${encodeURIComponent(id)}/events?${query.toString()}`);
+    const payload = await requestJson(`${api}/buckets/${encodeURIComponent(id)}/events?${query.toString()}`);
     if (!Array.isArray(payload)) return { bucket: { ...base, error: "ActivityWatch returned an unexpected event format." }, events: [], tabs: [] };
     const events: ActivityWatchRecord[] = [];
     const tabs: ActivityWatchTab[] = [];

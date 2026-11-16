@@ -41,6 +41,7 @@ const routeTitles: Record<AppRoute, string> = {
 
 export function AppShell({ route, onNavigate, updateControl, children }: AppShellProps): React.JSX.Element {
   const workspaceRef = useRef<HTMLElement>(null);
+  const android = typeof window !== "undefined" && Boolean(window.ActivityUsageAndroid);
 
   useLayoutEffect(() => {
     const workspace = workspaceRef.current;
@@ -49,6 +50,30 @@ export function AppShell({ route, onNavigate, updateControl, children }: AppShel
     workspace.scrollLeft = 0;
     workspace.removeAttribute("data-scrolled");
   }, [route]);
+
+  if (android) return (
+    <div className="atlas-app-shell android-shell">
+      <header className="android-app-bar">
+        <div className="android-app-brand"><img alt="" src="./activityusage.png" /><span>Activity Usage</span></div>
+        <nav aria-label="App settings and sources">
+          <RailButton icon={PulseIcon} isCurrent={route === "sources"} label="Sources" onPress={() => onNavigate("sources")} />
+          <RailButton icon={SettingsIcon} isCurrent={route === "settings"} label="Settings" onPress={() => onNavigate("settings")} />
+        </nav>
+      </header>
+      <main className="atlas-app-shell__workspace" aria-label={routeTitles[route]} onScroll={handleWorkspaceScroll} ref={workspaceRef}>
+        {children}
+      </main>
+      <nav className="android-bottom-navigation" aria-label="Device activity pages">
+        {primaryNavigation.filter(item => item.route !== "sources").map(({ route: destination, label, icon: Icon }) => (
+          <button key={destination} type="button" aria-label={label} aria-current={route === destination ? "page" : undefined}
+            onClick={() => onNavigate(destination)}>
+            <span className="android-navigation-icon"><Icon aria-hidden="true" /></span>
+            <span>{destination === "statistics" ? "Stats" : label}</span>
+          </button>
+        ))}
+      </nav>
+    </div>
+  );
 
   return (
     <div className="atlas-app-shell">

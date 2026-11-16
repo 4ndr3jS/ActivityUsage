@@ -16,7 +16,7 @@ import squirrelStartup from "electron-squirrel-startup";
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { readActivityWatchCategories, readActivityWatchData } from "./activitywatch";
+import { readActivityWatchCategories, readActivityWatchData } from "../shared/activitywatch";
 import { configureAutoUpdates, type DesktopUpdater } from "./updates";
 import { DOWNLOAD_PAGE_URL } from "./update-feed";
 import { windowSizeForWorkArea } from "./window-sizing";

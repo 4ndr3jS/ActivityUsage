@@ -44,6 +44,7 @@ export interface ActivityWatchTab {
 
 export interface ActivityWatchSnapshot {
   connected: true;
+  source?: "desktop-mirror" | "android-local";
   fetchedAt: string;
   buckets: ActivityWatchBucket[];
   events: ActivityWatchRecord[];

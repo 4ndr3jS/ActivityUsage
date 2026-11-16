@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Button, Popover } from "@heroui/react";
 import type { ActivityDevice, ActivityWatchBucket, ActivityWatchCategory, ActivityWatchRange, ActivityWatchRecord, ActivityWatchSnapshot } from "../../shared/desktop-api";
-import { RefreshIcon, ShareIcon } from "../icons";
+import { ChevronDownIcon, RefreshIcon, ShareIcon } from "../icons";
 import { Area } from "./dither-kit/area";
 import { AreaChart } from "./dither-kit/area-chart";
 import { Bar } from "./dither-kit/bar";
@@ -56,6 +57,8 @@ interface AppActivity {
 
 export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.Element {
   const isOverview = view === "overview";
+  const android = window.ActivityUsageAndroid;
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const [range, setRange] = useState<ActivityRange>(isOverview ? 1 : DEFAULT_HISTORY_DAYS);
   const [pickedDay, setPickedDay] = useState<string | null>(null);
   const [wasOverview, setWasOverview] = useState(isOverview);
@@ -114,6 +117,9 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   const requestKey = JSON.stringify([currentKey, previousKey]);
   const snapshot = snapshots.get(currentKey) ?? null;
   const previousSnapshot = previousKey ? snapshots.get(previousKey) : undefined;
+  const syncLabel = snapshot?.source === "desktop-mirror"
+    ? `Desktop and phone synced · ${new Date(snapshot.fetchedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
+    : android?.hasSyncFolder() && snapshot ? "Waiting for desktop sync · showing phone activity" : null;
   const activeRequest = requestState?.key === requestKey ? requestState : null;
   const error = activeRequest?.error ?? null;
   const loading = activeRequest?.loading ?? !snapshot;
@@ -274,7 +280,7 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
     <section className="activity-dashboard" data-view={view} aria-label="Device activity dashboard">
 
 
-      <div className="activity-toolbar" aria-label="Activity controls">
+      {(!android || view !== "settings") && <div className="activity-toolbar" aria-label="Activity controls">
         <div className="activity-period-controls">
           <TimeNavigator
             canMoveBack={range !== "all"}
@@ -295,8 +301,20 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
             <option value="all">All devices</option><option value="computer">Computer</option><option value="phone">Phone</option>
           </select>
         </label>
-        {view !== "statistics" && <label className="activity-switch"><input type="checkbox" checked={comparePeriod} disabled={range === "all"} onChange={event => setCompare(event.target.checked)} /><span>Compare</span></label>}
-        <div className="activity-toolbar__actions">
+        {!android && view !== "statistics" && <label className="activity-switch"><input type="checkbox" checked={comparePeriod} disabled={range === "all"} onChange={event => setCompare(event.target.checked)} /><span>Compare</span></label>}
+        {android ? <Popover isOpen={optionsOpen} onOpenChange={setOptionsOpen}>
+          <Button className="android-options-trigger" variant="secondary" aria-label="Activity options">Options<ChevronDownIcon /></Button>
+          <Popover.Content className="android-options-popover" placement="bottom end" offset={8}>
+            <Popover.Dialog className="android-options-menu">
+              <Popover.Heading>Activity options</Popover.Heading>
+              {view !== "statistics" && view !== "sources" && <label className="activity-switch">
+                <span>Compare previous period</span><input type="checkbox" checked={comparePeriod} disabled={range === "all"} onChange={event => setCompare(event.target.checked)} />
+              </label>}
+              <Button variant="ghost" isDisabled={loading} onPress={() => { setOptionsOpen(false); void loadData(true); }}><RefreshIcon />Refresh activity</Button>
+              <Button variant="ghost" isDisabled={!snapshot || exporting} onPress={() => { setOptionsOpen(false); void exportSummary(); }}><ShareIcon />{exporting ? "Saving…" : "Export summary"}</Button>
+            </Popover.Dialog>
+          </Popover.Content>
+        </Popover> : <div className="activity-toolbar__actions">
           <button className="activity-icon-button" type="button" aria-label="Refresh ActivityWatch" title="Refresh ActivityWatch" disabled={loading} onClick={() => void loadData(true)}>
             <RefreshIcon />
           </button>
@@ -304,19 +322,22 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
             disabled={!snapshot || exporting} onClick={() => void exportSummary()}>
             <ShareIcon /><span>{exporting ? "Saving…" : "Export"}</span>
           </button>
-        </div>
-      </div>
+        </div>}
+      </div>}
 
       {view !== "overview" && <header className="activity-dashboard__heading">
-        <div>{view !== "statistics" && <p className="activity-eyebrow">{view === "history" ? "Collected history" : "Local device history"}</p>}
+        <div>{!android && view !== "statistics" && <p className="activity-eyebrow">{view === "history" ? "Collected history" : "Local device history"}</p>}
           <h1>{pageTitle[view]}</h1>
-          <p className="activity-dashboard__subtitle">{view === "history" ? "How your computer and phone activity changes over time."
+          <p className="activity-dashboard__subtitle">{android ? (view === "settings" ? "Make Activity Usage yours." : view === "sources" ? "Your connected activity records." : periodLabel) : view === "history" ? "How your computer and phone activity changes over time."
             : view === "statistics" ? periodLabel : "Your ActivityWatch history, kept on this computer."}</p>
         </div>
-        <div className={`activity-live-pill${error ? " is-offline" : ""}`}><span />{error ? "ActivityWatch unavailable" : snapshot ? "ActivityWatch connected" : "Reading activity…"}</div>
+        <div className={`activity-live-pill${error ? " is-offline" : ""}`}><span />{syncLabel ?? (error ? "ActivityWatch unavailable" : snapshot ? "ActivityWatch connected" : "Reading activity…")}</div>
       </header>}
+      {view === "overview" && syncLabel && <div className="activity-live-pill"><span />{syncLabel}</div>}
 
-      {error && <div className="activity-error" role="alert"><strong>ActivityWatch data unavailable</strong><span>{error}</span><button type="button" onClick={() => void loadData(true)}>Retry</button></div>}
+      {error && <div className="activity-error" role="alert"><strong>ActivityWatch data unavailable</strong><span>{error}</span><button type="button" onClick={() => void loadData(true)}>Retry</button>
+        {android && <button type="button" onClick={() => android.connectActivityWatch()}>Connect</button>}
+      </div>}
       {notice && <div className="activity-notice" role="status"><span>{notice}</span><button type="button" aria-label="Dismiss notification" onClick={() => setNotice(null)}>×</button></div>}
       {view !== "history" && loading && !snapshot && <div className="activity-loading" role="status"><span className="activity-spinner" />Reading local ActivityWatch history…</div>}
       {!loading && !snapshot && !error && <div className="activity-empty">No ActivityWatch records are available yet.</div>}
@@ -521,6 +542,7 @@ function ActivitySettingsView({ showTitles, includeLabels, autoRefresh, onShowTi
   onAutoRefresh(value: boolean): void;
 }): React.JSX.Element {
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "System default";
+  const android = window.ActivityUsageAndroid;
   return <div className="activity-settings-grid">
     <section className="activity-glass-card activity-privacy-card"><p className="activity-eyebrow">PRIVACY</p><h2>Local activity controls</h2>
       <PreferenceToggle checked={showTitles} label="Show window titles" note="Window titles may reveal document or page names." onChange={onShowTitles} />
@@ -530,8 +552,19 @@ function ActivitySettingsView({ showTitles, includeLabels, autoRefresh, onShowTi
     </section>
     <section className="activity-glass-card activity-privacy-card"><p className="activity-eyebrow">DISPLAY</p><h2>Reporting time zone</h2>
       <div className="activity-timezone-row"><span>System time zone</span><strong>{timeZone}</strong></div>
-      <p className="activity-privacy-note">Day boundaries and chart labels use your computer’s current time zone.</p>
+      <p className="activity-privacy-note">Day boundaries and chart labels use your {android ? "phone’s" : "computer’s"} current time zone.</p>
     </section>
+    {android && <section className="activity-glass-card activity-privacy-card">
+      <h2>ActivityWatch connection</h2>
+      <button className="activity-button android-reconnect" type="button" onClick={() => android.connectActivityWatch()}>Change API key</button>
+    </section>}
+    {android && <section className="activity-glass-card activity-privacy-card">
+      <h2>Desktop sync</h2>
+      <p className="activity-explainer">Choose the Activity Usage folder that Syncthing receives from your computer.</p>
+      <button className="activity-button android-reconnect" type="button" onClick={() => android.chooseSyncFolder()}>
+        {android.hasSyncFolder() ? "Change sync folder" : "Choose sync folder"}
+      </button>
+    </section>}
   </div>;
 }
 

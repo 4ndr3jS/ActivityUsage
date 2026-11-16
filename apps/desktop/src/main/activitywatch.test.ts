@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { readActivityWatchCategories, readActivityWatchData } from "./activitywatch";
+import { readActivityWatchCategories, readActivityWatchData } from "../shared/activitywatch";
 
 afterEach(() => vi.unstubAllGlobals());
 
