@@ -103,6 +103,7 @@ export function usePolarController({
   bloom = "off",
   bloomOnHover = false,
   defaultSelectedDataKey = null,
+  controlledSelection,
   onSelectionChange,
 }: {
   chartType: "pie" | "radar"
@@ -119,6 +120,7 @@ export function usePolarController({
   bloom?: BloomInput
   bloomOnHover?: boolean
   defaultSelectedDataKey?: string | null
+  controlledSelection?: string | null
   onSelectionChange?: (key: string | null) => void
 }): PolarChartContextValue {
   // This object becomes the PolarChartContext value, so its identity — and the
@@ -132,9 +134,10 @@ export function usePolarController({
   const configKeys = useMemo(() => Object.keys(config), [config])
   const revision = useRevision(data, replayToken)
 
-  const [selectedDataKey, setSelectedDataKey] = useState<string | null>(
+  const [uncontrolledSelection, setSelectedDataKey] = useState<string | null>(
     defaultSelectedDataKey
   )
+  const selectedDataKey = controlledSelection === undefined ? uncontrolledSelection : controlledSelection
   const [focusDataKey, setFocusDataKey] = useState<string | null>(null)
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
   const [cursorX, setCursorX] = useState(0)
@@ -167,10 +170,10 @@ export function usePolarController({
   // Stable so the value keeps its identity; re-created only on config change.
   const selectDataKey = useCallback(
     (key: string | null) => {
-      setSelectedDataKey(key)
+      if (controlledSelection === undefined) setSelectedDataKey(key)
       onSelectionChange?.(key)
     },
-    [onSelectionChange]
+    [controlledSelection, onSelectionChange]
   )
 
   // The root spreads margins fresh every render; pin a stable object off the

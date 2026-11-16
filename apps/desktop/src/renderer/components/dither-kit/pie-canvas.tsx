@@ -10,20 +10,33 @@ import {
   prefersReducedMotion,
 } from "./dither-paint"
 import { rgb } from "./palette"
-import { sliceAtAngle } from "./polar"
+import { sliceAtAngle, type PieSlice } from "./polar"
 import { usePolarChart } from "./polar-context"
 import { scheduleCanvas, type CanvasScheduler } from "./canvas-scheduler"
 
 const TOP = -Math.PI / 2
 const TAU = Math.PI * 2
 const POP = 6
+const SELECTION_DURATION = 360
+
+function fillSelectedSlice(slices: PieSlice[], key: string | null): PieSlice[] {
+  const selected = slices.findIndex(slice => slice.name === key)
+  if (selected < 0) return slices
+  return slices.map((slice, index) => {
+    const start = index <= selected ? TOP : TOP + TAU
+    const end = index < selected ? TOP : TOP + TAU
+    return { ...slice, start, end, mid: (start + end) / 2 }
+  })
+}
 
 /**
  * Dither canvas for pie / donut charts. Each backing pixel is mapped back to
  * plot space, tested for its slice by angle, and filled with the ordered-dither
  * scatter. The pie sweeps in clockwise on mount and hovered slices bulge out.
  */
-export function PieCanvas({ expandOnHover = true }: { expandOnHover?: boolean }) {
+export function PieCanvas({ expandOnHover = true, fillOnSelection = false }: {
+  expandOnHover?: boolean; fillOnSelection?: boolean
+}) {
   const ctx = usePolarChart()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const bloomRef = useRef<HTMLCanvasElement>(null)
@@ -63,11 +76,14 @@ export function PieCanvas({ expandOnHover = true }: { expandOnHover?: boolean })
     let lastPaintSig = ""
     let lastSelected: string | null | undefined = Symbol() as never
     let lastHover: number | null | undefined = Symbol() as never
+    let basePie: PieSlice[] | null = null
+    let shownPie: PieSlice[] | null = null
+    let targetPie: PieSlice[] | null = null
+    let ringSelection: string | null = null
+    let sweep: { from: PieSlice[]; start: number } | null = null
 
-    const paint = (prog: number) => {
+    const paint = (prog: number, slices: PieSlice[]) => {
       const s = state.current
-      const slices = s.pie
-      if (!slices) return
       c.clearRect(0, 0, cols, rows)
       const cx = s.center.x
       const cy = s.center.y
@@ -91,7 +107,7 @@ export function PieCanvas({ expandOnHover = true }: { expandOnHover?: boolean })
           const sliceIndex = sliceAtAngle(slices, angle)
           if (sliceIndex < 0) continue
           const slice = slices[sliceIndex]
-          const active = s.hoverIndex === sliceIndex
+          const active = (!fillOnSelection || s.selectedDataKey === null) && s.hoverIndex === sliceIndex
           const expansion = active && expandOnHover ? popEase : 0
           const localOuter = outerR + POP * expansion
           if (r > localOuter) continue
@@ -100,7 +116,7 @@ export function PieCanvas({ expandOnHover = true }: { expandOnHover?: boolean })
           const variant = s.variantOf(slice.name)
           const emphasis = s.selectedDataKey ?? s.focusDataKey
           const selectionDim =
-            emphasis !== null && emphasis !== slice.name ? 0.3 : 1
+            !fillOnSelection && emphasis !== null && emphasis !== slice.name ? 0.3 : 1
           const activeIntensity = intensity + (active ? 0.4 * popEase : 0)
 
           if (localOuter - r < 1.4 + expansion) {
@@ -139,6 +155,31 @@ export function PieCanvas({ expandOnHover = true }: { expandOnHover?: boolean })
       }
       if (!animStart) animStart = now
       const prog = animate ? Math.min(1, (now - animStart) / duration) : 1
+      if (fillOnSelection && (s.pie !== basePie || ringSelection !== s.selectedDataKey)) {
+        targetPie = fillSelectedSlice(s.pie, s.selectedDataKey)
+        const sameOrder = basePie?.length === s.pie.length && s.pie.every((slice, index) => slice.name === basePie?.[index].name)
+        if (shownPie && sameOrder && ringSelection !== s.selectedDataKey && !prefersReducedMotion()) {
+          // A new selection starts from the angles on screen, including mid-sweep.
+          sweep = { from: shownPie, start: now }
+        } else if (!sameOrder || prefersReducedMotion()) {
+          sweep = null
+        }
+        if (!sweep) shownPie = targetPie
+        basePie = s.pie
+        ringSelection = s.selectedDataKey
+        needsFill = true
+      }
+      if (sweep && targetPie) {
+        const { from, start } = sweep
+        const progress = easeInOutCubic(Math.min(1, (now - start) / SELECTION_DURATION))
+        shownPie = targetPie.map((slice, index) => ({
+          ...slice,
+          start: from[index].start + (slice.start - from[index].start) * progress,
+          end: from[index].end + (slice.end - from[index].end) * progress,
+        }))
+        if (progress === 1) sweep = null
+        needsFill = true
+      }
 
       const emphasisNow = s.selectedDataKey ?? s.focusDataKey
       if (emphasisNow !== lastSelected) {
@@ -175,19 +216,19 @@ export function PieCanvas({ expandOnHover = true }: { expandOnHover?: boolean })
       }
 
       if (!needsFill) return
-      paint(prog)
+      paint(prog, shownPie ?? s.pie)
       needsFill = false
       if (bloomCtx) {
         bloomCtx.clearRect(0, 0, cols, rows)
         if (s.bloom !== "off") bloomCtx.drawImage(canvas, 0, 0)
       }
-      return prog < 1 || Math.abs(intensity - intensityTarget) > 0.001 || Math.abs(popEase - popTarget) > 0.001
+      return sweep !== null || prog < 1 || Math.abs(intensity - intensityTarget) > 0.001 || Math.abs(popEase - popTarget) > 0.001
     }
 
     const scheduler = scheduleCanvas(canvas, draw)
     schedulerRef.current = scheduler
     return () => { scheduler.dispose(); schedulerRef.current = undefined }
-  }, [cols, rows, width, height, expandOnHover])
+  }, [cols, rows, width, height, expandOnHover, fillOnSelection])
 
   const bloom = bloomLayerStyle(
     ctx.bloom,

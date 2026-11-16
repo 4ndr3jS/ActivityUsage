@@ -29,7 +29,7 @@ export function App(): React.JSX.Element {
 
 function routeFromHash(hash: string): AppRoute {
   const candidate = hash.replace(/^#/, "");
-  if (candidate === "day" || candidate === "trends" || candidate === "activity" || candidate === "statistics" || candidate === "insights" || candidate === "sources" || candidate === "settings") {
+  if (candidate === "day" || candidate === "trends" || candidate === "statistics" || candidate === "insights" || candidate === "sources" || candidate === "settings") {
     return candidate;
   }
   return "day";
@@ -37,7 +37,6 @@ function routeFromHash(hash: string): AppRoute {
 
 function viewForRoute(route: AppRoute): ActivityView {
   if (route === "trends") return "history";
-  if (route === "activity") return "breakdown";
   if (route === "statistics") return "statistics";
   if (route === "insights") return "insights";
   if (route === "sources") return "sources";

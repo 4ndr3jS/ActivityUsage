@@ -91,20 +91,18 @@ export function buildActivityStatistics(
         classified.set(matchKey, path);
       }
 
-      let root = getCategory(path);
-      const leaf = root;
-      root.seconds += seconds;
-      for (let depth = path.length - 1; depth > 0; depth--) {
-        root = getCategory(path.slice(0, depth));
-        root.seconds += seconds;
-      }
+      const leaf = getCategory(path);
+      const ancestors = path.map((_, index) => getCategory(path.slice(0, index + 1)));
+      for (const category of ancestors) category.seconds += seconds;
 
       if (periods.length) {
         while (periodIndex < periods.length && periods[periodIndex].end <= start) periodIndex++;
         for (let index = periodIndex; index < periods.length && periods[index].start < end; index++) {
           const bin = periods[index];
           const overlap = Math.min(end, bin.end) - Math.max(start, bin.start);
-          bin.totals.set(root.id, (bin.totals.get(root.id) ?? 0) + overlap / 1000);
+          for (const category of ancestors) {
+            bin.totals.set(category.id, (bin.totals.get(category.id) ?? 0) + overlap / 1000);
+          }
         }
       }
 
@@ -120,7 +118,8 @@ export function buildActivityStatistics(
       }
       addRank(group.apps, app, { label: app, seconds });
       if (showTitles && event.title) {
-        addRank(group.titles, JSON.stringify([app, event.title]), { label: event.title, app, seconds });
+        const label = windowTitleLabel(event.title, app);
+        addRank(group.titles, JSON.stringify([app, label]), { label, app, seconds });
       }
     }
   }
@@ -137,14 +136,28 @@ export function buildActivityStatistics(
   };
 }
 
-export function rankActivity(statistics: ActivityStatistics, selected: CategoryTotal | undefined): {
+function windowTitleLabel(title: string, app: string): string {
+  const suffix = /^(.*)\s+[-–—|]\s+(.+)$/u.exec(title);
+  const label = suffix && suffix[2].trim().toLowerCase() === app.toLowerCase()
+    ? suffix[1].trim()
+    : title;
+  const build = /^(.+?)(?:\s+\(([^()]*)\)|,\s+([^()]+))$/u.exec(label);
+  const details = build?.[2] ?? build?.[3];
+  if (!build || !details) return label;
+  const comparable = (name: string) => name.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+  if (comparable(build[1]) !== comparable(app)) return label;
+  const buildFlag = /^(?:32-bit|64-bit|x86|x64|win32|win64|dx\d+|vulkan|opengl|cooked|shipping|release|debug)$/i;
+  return details.trim().split(/[\s,]+/).every(flag => buildFlag.test(flag)) ? build[1].trim() : label;
+}
+
+export function rankActivity(statistics: ActivityStatistics, selected: readonly CategoryTotal[] = []): {
   apps: Rank[];
   titles: Rank[];
 } {
   const apps = new Map<string, Rank>();
   const titles = new Map<string, Rank>();
   for (const group of statistics.ranks) {
-    if (selected && !selected.path.every((part, index) => part === group.path[index])) continue;
+    if (selected.length && !selected.some(category => category.path.every((part, index) => part === group.path[index]))) continue;
     for (const [key, value] of group.apps) addRank(apps, key, value);
     for (const [key, value] of group.titles) addRank(titles, key, value);
   }

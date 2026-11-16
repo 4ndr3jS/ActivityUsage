@@ -128,9 +128,10 @@ export function BarCanvas() {
         const emphasis = s.selectedDataKey ?? s.focusDataKey
         const selDim = emphasis !== null && emphasis !== key ? 0.3 : 1
         for (let i = 0; i < s.dataLength; i++) {
-          const bp = barProgress(i, s.dataLength, prog)
           const base = t.base[i] ?? rows - 1
-          const grown = base + ((t.top[i] ?? base) - base) * bp
+          const target = t.top[i] ?? base
+          if (target === base) continue
+          const grown = base + (target - base) * barProgress(i, s.dataLength, prog)
           // Bars grow from the zero baseline toward the value. Positive values
           // sit above the baseline (smaller pixel), negative ones below it —
           // paintColumn wants the higher edge first, so order the pair.

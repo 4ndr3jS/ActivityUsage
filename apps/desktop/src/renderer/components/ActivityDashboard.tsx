@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ActivityDevice, ActivityWatchBucket, ActivityWatchRange, ActivityWatchRecord, ActivityWatchSnapshot } from "../../shared/desktop-api";
-import { ChevronRightIcon, RefreshIcon, ShareIcon } from "../icons";
+import type { ActivityDevice, ActivityWatchBucket, ActivityWatchCategory, ActivityWatchRange, ActivityWatchRecord, ActivityWatchSnapshot } from "../../shared/desktop-api";
+import { RefreshIcon, ShareIcon } from "../icons";
 import { Area } from "./dither-kit/area";
 import { AreaChart } from "./dither-kit/area-chart";
 import { Bar } from "./dither-kit/bar";
@@ -17,14 +17,14 @@ import { createActivityPeriod } from "../activity-period";
 import { subscribeActivityRefresh } from "../activity-refresh";
 import { activitySnapshotKey, createActivitySnapshotCache } from "../activity-snapshots";
 import { appLabel } from "../app-label";
-import { buildBrowserActivity, type BrowserActivity } from "../browser-activity";
+import { buildActivityStatistics } from "../activity-statistics";
 import { formatPeriodLabel, shiftDay, todayDay, type AnalyticsRange } from "../personal-analytics";
 import { TimeNavigator } from "./AnalyzerControls";
 import { ActivityStatistics } from "./ActivityStatistics";
 import "./activity-dashboard.css";
 
 type ActivityRange = 1 | AnalyticsRange;
-export type ActivityView = "overview" | "history" | "breakdown" | "statistics" | "insights" | "sources" | "settings";
+export type ActivityView = "overview" | "history" | "statistics" | "insights" | "sources" | "settings";
 type DeviceFilter = "all" | ActivityDevice;
 const EMPTY_EVENTS: ActivityWatchRecord[] = [];
 const DEFAULT_HISTORY_DAYS = 30;
@@ -69,6 +69,8 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   const [calendarDay, setCalendarDay] = useState(todayDay);
   const autoRequestRunning = useRef(false);
   const [snapshots, setSnapshots] = useState<ReadonlyMap<string, ActivityWatchSnapshot>>(() => new Map());
+  const [categoryRules, setCategoryRules] = useState<ActivityWatchCategory[]>([]);
+  const [rulesStatus, setRulesStatus] = useState<"loading" | "ready" | "error">("loading");
   const [readSnapshot] = useState(() => createActivitySnapshotCache(
     range => window.usageAtlas.getActivityWatchData(range), setSnapshots
   ));
@@ -97,12 +99,10 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
     const anchor = range === 1 ? selectedDay : calendarDay;
     return createActivityPeriod(range === "all" ? 1 : range, periodOffset, new Date(`${anchor}T12:00:00`));
   }, [calendarDay, periodOffset, range, selectedDay]);
-  const includeBrowserTabs = view === "breakdown";
   const currentQuery = useMemo<ActivityWatchRange>(() => ({
     start: range === "all" ? null : requestedPeriod.start.toISOString(),
-    end: requestedPeriod.end.toISOString(),
-    includeBrowserTabs
-  }), [range, requestedPeriod, includeBrowserTabs]);
+    end: requestedPeriod.end.toISOString()
+  }), [range, requestedPeriod]);
   const previousQuery = useMemo<ActivityWatchRange | null>(() => {
     if (!comparePeriod) return null;
     const start = new Date(requestedPeriod.start);
@@ -112,17 +112,15 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   const currentKey = activitySnapshotKey(currentQuery);
   const previousKey = previousQuery ? activitySnapshotKey(previousQuery) : null;
   const requestKey = JSON.stringify([currentKey, previousKey]);
-  const requestedSnapshot = snapshots.get(currentKey);
-  const snapshot = requestedSnapshot ?? (includeBrowserTabs
-    ? snapshots.get(activitySnapshotKey({ ...currentQuery, includeBrowserTabs: false })) ?? null
-    : null);
+  const snapshot = snapshots.get(currentKey) ?? null;
   const previousSnapshot = previousKey ? snapshots.get(previousKey) : undefined;
   const activeRequest = requestState?.key === requestKey ? requestState : null;
   const error = activeRequest?.error ?? null;
-  const loading = activeRequest?.loading ?? !requestedSnapshot;
-  const browserStatus = includeBrowserTabs && !requestedSnapshot
-    ? (error ? "Browser details unavailable." : "Reading browser activity…")
-    : null;
+  const loading = activeRequest?.loading ?? !snapshot;
+  const historyPeriod = useMemo(() => createActivityPeriod(DEFAULT_HISTORY_DAYS, 0, new Date(`${calendarDay}T12:00:00`)), [calendarDay]);
+  const historyQuery = useMemo(() => ({ start: historyPeriod.start.toISOString(), end: historyPeriod.end.toISOString() }), [historyPeriod]);
+  const historyKey = activitySnapshotKey(historyQuery);
+  const historySnapshot = snapshots.get(historyKey);
 
   const loadData = useCallback(async (refresh = false): Promise<void> => {
     const request = ++requestVersion.current;
@@ -146,15 +144,26 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
     return () => { window.clearTimeout(timer); requestVersion.current += 1; };
   }, [loadData]);
   useEffect(() => {
-    const { start, end } = createActivityPeriod(DEFAULT_HISTORY_DAYS, 0, new Date(`${calendarDay}T12:00:00`));
-    const dates = { start: start.toISOString(), end: end.toISOString() };
-    // History and Breakdown use distinct cache entries for the same dates.
-    // Preload both so opening either view can reuse its in-flight request.
-    void Promise.allSettled([
-      readSnapshot(dates),
-      readSnapshot({ ...dates, includeBrowserTabs: true })
-    ]);
-  }, [calendarDay, isOverview, readSnapshot]);
+    // History, Statistics, and Sources start with the same history snapshot.
+    void readSnapshot(historyQuery).catch(() => {});
+  }, [historyQuery, readSnapshot]);
+  const statisticsSnapshot = isOverview ? historySnapshot : snapshot ?? historySnapshot;
+  const categoryRevision = statisticsSnapshot?.fetchedAt;
+  useEffect(() => {
+    if (!categoryRevision) return;
+    let active = true;
+    void window.usageAtlas.getActivityWatchCategories().then(
+      categories => {
+        if (!active) return;
+        setCategoryRules(previous => JSON.stringify(previous) === JSON.stringify(categories) ? previous : categories);
+        setRulesStatus("ready");
+      },
+      () => {
+        if (active) setRulesStatus("error");
+      }
+    );
+    return () => { active = false; };
+  }, [categoryRevision]);
   useEffect(() => {
     if (!autoRefresh) return undefined;
     return subscribeActivityRefresh(() => {
@@ -188,20 +197,25 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   }), [days, device]);
   const needsHours = view === "overview" && range === 1;
   const needsHourProfile = view === "insights";
-  const needsApps = view === "overview" || view === "breakdown" || view === "insights";
+  const needsApps = view === "overview" || view === "insights";
+  const includeAppTitles = view === "overview" && showTitles;
   const hours = useMemo(() => needsHours ? buildHours(events, period.start, device) : [], [device, events, period.start, needsHours]);
   const hourProfile = useMemo(() => needsHourProfile ? buildHourProfile(events, device) : [], [device, events, needsHourProfile]);
-  const apps = useMemo(() => needsApps ? buildApps(visibleEvents, showTitles && !includeBrowserTabs) : [], [showTitles, visibleEvents, needsApps, includeBrowserTabs]);
-  const browsers = useMemo(() => includeBrowserTabs && requestedSnapshot
-    ? buildBrowserActivity(visibleEvents, requestedSnapshot.tabs, requestedSnapshot.buckets)
-    : new Map<string, BrowserActivity>(), [includeBrowserTabs, requestedSnapshot, visibleEvents]);
+  const apps = useMemo(() => needsApps ? buildApps(visibleEvents, includeAppTitles) : [], [includeAppTitles, visibleEvents, needsApps]);
+  const useHistoryForStatistics = isOverview || !snapshot || currentKey === historyKey;
+  const statisticsPeriod = useHistoryForStatistics ? historyPeriod : period;
+  const statisticsHourly = !useHistoryForStatistics && range === 1;
+  const rulesLoaded = rulesStatus !== "loading";
+  const statistics = useMemo(() => {
+    if (!statisticsSnapshot || !rulesLoaded) return null;
+    return buildActivityStatistics(filterEvents(statisticsSnapshot.events, device), categoryRules, statisticsPeriod, statisticsHourly, showTitles);
+  }, [categoryRules, device, rulesLoaded, showTitles, statisticsHourly, statisticsPeriod, statisticsSnapshot]);
   const peakDay = visibleDays.reduce<DayActivity | null>((peak, day) => !peak || day.combined > peak.combined ? day : peak, null);
   const periodLabel = labelPeriod(period, range, calendarDay);
   const navigatorLabel = range === 1 || periodOffset < 0 ? periodLabel : formatPeriodLabel(range);
   const pageTitle: Record<ActivityView, string> = {
     overview: "Your device activity",
     history: "Activity history",
-    breakdown: "Activity breakdown",
     statistics: "Activity statistics",
     insights: "Your activity rhythm",
     sources: "ActivityWatch sources",
@@ -257,7 +271,7 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   }
 
   return (
-    <section className="activity-dashboard" aria-label="Device activity dashboard">
+    <section className="activity-dashboard" data-view={view} aria-label="Device activity dashboard">
 
 
       <div className="activity-toolbar" aria-label="Activity controls">
@@ -286,8 +300,9 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
           <button className="activity-icon-button" type="button" aria-label="Refresh ActivityWatch" title="Refresh ActivityWatch" disabled={loading} onClick={() => void loadData(true)}>
             <RefreshIcon />
           </button>
-          <button className="activity-button" type="button" disabled={!snapshot || exporting} onClick={() => void exportSummary()}>
-            <ShareIcon />{exporting ? "Saving…" : "Export"}
+          <button className="activity-button activity-toolbar-export" type="button" aria-label={exporting ? "Saving activity summary" : "Export"}
+            disabled={!snapshot || exporting} onClick={() => void exportSummary()}>
+            <ShareIcon /><span>{exporting ? "Saving…" : "Export"}</span>
           </button>
         </div>
       </div>
@@ -303,16 +318,15 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
 
       {error && <div className="activity-error" role="alert"><strong>ActivityWatch data unavailable</strong><span>{error}</span><button type="button" onClick={() => void loadData(true)}>Retry</button></div>}
       {notice && <div className="activity-notice" role="status"><span>{notice}</span><button type="button" aria-label="Dismiss notification" onClick={() => setNotice(null)}>×</button></div>}
-      {view !== "history" && view !== "breakdown" && loading && !snapshot && <div className="activity-loading" role="status"><span className="activity-spinner" />Reading local ActivityWatch history…</div>}
+      {view !== "history" && loading && !snapshot && <div className="activity-loading" role="status"><span className="activity-spinner" />Reading local ActivityWatch history…</div>}
       {!loading && !snapshot && !error && <div className="activity-empty">No ActivityWatch records are available yet.</div>}
 
       {snapshot && view !== "sources" && view !== "settings" && (
         <>
           {view === "overview" && <OverviewView days={visibleDays} hours={hours} apps={apps} periodLabel={periodLabel} singleDay={range === 1} summary={summary} previous={comparePeriod ? previousSummary : null} peakDay={peakDay} />}
           {view === "history" && <HistoryView days={visibleDays} periodLabel={periodLabel} summary={summary} previous={comparePeriod ? previousSummary : null} />}
-          {view === "breakdown" && <BreakdownView apps={apps} browsers={browsers} browserStatus={browserStatus} />}
-          {view === "statistics" && <ActivityStatistics events={visibleEvents} period={period} hourly={range === 1}
-            allDevices={device === "all"} fetchedAt={snapshot.fetchedAt} showTitles={showTitles}
+          {view === "statistics" && <ActivityStatistics stats={statistics} hourly={statisticsHourly}
+            allDevices={device === "all"} rulesFailed={rulesStatus === "error"} showTitles={showTitles}
             onToggleTitles={() => updatePreference(WINDOW_TITLES_KEY, !showTitles, setShowTitles)} />}
           {view === "insights" && <InsightsView days={visibleDays} hours={hourProfile} apps={apps} summary={summary} />}
           <footer className="activity-dashboard__footer">
@@ -419,56 +433,6 @@ function DeviceMix({ summary }: { summary: Summary }): React.JSX.Element {
       </div>)}</div>
     </div>
     <div className="activity-mix-context"><span>Combined, overlap removed <b>{formatDuration(summary.combined)}</b></span><span>Recorded overlap <b>{formatDuration(summary.overlap)}</b></span></div>
-  </section>;
-}
-
-function BreakdownView({ apps, browsers, browserStatus }: {
-  apps: AppActivity[]; browsers: ReadonlyMap<string, BrowserActivity>; browserStatus: string | null;
-}): React.JSX.Element {
-  const [selection, setSelection] = useState<string>();
-  const selected = selection && browsers.has(selection) ? selection
-    : apps.find(app => browsers.has(app.label))?.label;
-  const activity = selected ? browsers.get(selected) : undefined;
-  return <div className="activity-breakdown-grid">
-    <AppList apps={apps} title="Applications" subtitle="Recorded app time. Select a browser for more detail."
-      browserSelection={{ selected, browsers, select: setSelection }} />
-    {selected && activity
-      ? <BrowserActivityPanel key={selected} browser={selected} activity={activity} />
-      : <section className="activity-glass-card activity-browser-panel">
-        <div className="activity-chart-panel__header"><div><h3>Browser activity</h3>
-          <p role="status">{browserStatus ?? "No browser use recorded for this device and date range."}</p>
-        </div></div>
-      </section>}
-  </div>;
-}
-
-function BrowserActivityPanel({ browser, activity }: { browser: string; activity: BrowserActivity }): React.JSX.Element {
-  const [mode, setMode] = useState<"sites" | "pages">("sites");
-  const [limit, setLimit] = useState(15);
-  const rows = activity[mode];
-  const recorded = activity.sites.reduce((sum, row) => sum + row.seconds, 0);
-  const duration = (seconds: number): string => seconds > 0 && seconds < 60 ? "<1m" : formatDuration(seconds);
-  return <section className="activity-glass-card activity-browser-panel" aria-label={`${browser} browser activity`}>
-    <div className="activity-chart-panel__header">
-      <div><h3>{browser} activity</h3><p>Time matched to an active tab by ActivityWatch</p></div>
-      <strong>{duration(recorded)}</strong>
-    </div>
-    <div className="activity-browser-modes" role="group" aria-label="Group browser activity">
-      {(["sites", "pages"] as const).map(value => <button type="button" key={value} aria-pressed={mode === value}
-        onClick={() => { setMode(value); setLimit(15); }}>{value === "sites" ? "Websites" : "Pages"}</button>)}
-    </div>
-    {rows.length ? <ol className="activity-browser-list">
-      {rows.slice(0, limit).map(row => <li key={JSON.stringify([row.label, row.address])}>
-        <div className="activity-app-row"><span title={row.label}>{row.label}</span><b>{duration(row.seconds)}</b></div>
-        <div className="activity-app-track" aria-hidden="true"><i style={{ width: `${row.seconds / rows[0].seconds * 100}%` }} /></div>
-      </li>)}
-    </ol> : <p className="activity-explainer">No matching tab records for this browser in the selected period. ActivityWatch’s browser watcher supplies website and page details.</p>}
-    {rows.length > limit && <button type="button" className="activity-button activity-browser-more" onClick={() => setLimit(value => value + 15)}>
-      Show more {mode === "sites" ? "websites" : "pages"}
-    </button>}
-    {activity.unassignedSeconds >= 0.001 && <div className="activity-browser-unassigned">
-      <span>Browser time without a matched tab</span><b>{duration(activity.unassignedSeconds)}</b>
-    </div>}
   </section>;
 }
 
@@ -596,26 +560,17 @@ function ChartPanel({ title, subtitle, rows, tone, kind = "area" }: {
   </section>;
 }
 
-function AppList({ apps, title, subtitle, browserSelection }: {
-  apps: AppActivity[]; title: string; subtitle: string;
-  browserSelection?: { selected?: string; browsers: ReadonlyMap<string, BrowserActivity>; select(label: string): void };
-}): React.JSX.Element {
+function AppList({ apps, title, subtitle }: { apps: AppActivity[]; title: string; subtitle: string }): React.JSX.Element {
   const maximum = Math.max(1, apps[0]?.seconds ?? 0);
   return <section className="activity-glass-card activity-app-list"><div className="activity-chart-panel__header"><div><h3>{title}</h3><p>{subtitle}</p></div></div>
-    {apps.length ? <ol>{apps.map((app, index) => {
-      const selectable = browserSelection?.browsers.has(app.label);
-      const label = <><span title={app.label}>{app.label}{selectable && <ChevronRightIcon />}</span><b>{formatDuration(app.seconds)}</b></>;
-      return <li key={app.label}>
+    {apps.length ? <ol>{apps.map((app, index) => <li key={app.label}>
         <span className="activity-app-rank">{String(index + 1).padStart(2, "0")}</span>
         <div className="activity-app-detail">
-          {selectable ? <button type="button" className="activity-app-row activity-browser-select"
-            aria-pressed={browserSelection?.selected === app.label} onClick={() => browserSelection?.select(app.label)}>{label}</button>
-            : <div className="activity-app-row">{label}</div>}
+          <div className="activity-app-row"><span title={app.label}>{app.label}</span><b>{formatDuration(app.seconds)}</b></div>
           <div className="activity-app-track"><i style={{ width: `${app.seconds / maximum * 100}%` }} /></div>
           <small>{app.events.toLocaleString()} recorded events</small>
         </div>
-      </li>;
-    })}</ol> : <p className="activity-empty">No app-level events in this range.</p>}
+      </li>)}</ol> : <p className="activity-empty">No app-level events in this range.</p>}
   </section>;
 }
 

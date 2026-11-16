@@ -51,7 +51,9 @@ export type PolarRootProps<TData extends Row> = {
   bloom?: BloomInput
   bloomOnHover?: boolean
   defaultSelectedDataKey?: string | null
+  selectedDataKey?: string | null
   onSelectionChange?: (key: string | null) => void
+  onSlicePress?: (key: string) => void
 }
 
 export function PolarRoot<TData extends Row>({
@@ -72,7 +74,9 @@ export function PolarRoot<TData extends Row>({
   bloom = "off",
   bloomOnHover = false,
   defaultSelectedDataKey = null,
+  selectedDataKey,
   onSelectionChange,
+  onSlicePress,
 }: PolarRootProps<TData>) {
   const { ref, size } = useChartDimensions<HTMLDivElement>()
   const margins = { ...DEFAULT_POLAR_MARGINS, ...marginsProp }
@@ -93,6 +97,7 @@ export function PolarRoot<TData extends Row>({
     bloom,
     bloomOnHover,
     defaultSelectedDataKey,
+    controlledSelection: selectedDataKey,
     onSelectionChange,
   })
 
@@ -106,22 +111,29 @@ export function PolarRoot<TData extends Row>({
     else svgChildren.push(child)
   })
 
-  const onMove = (clientX: number, clientY: number) => {
-    const el = ref.current
-    if (!el) return
-    const rect = el.getBoundingClientRect()
-    const dx = clientX - rect.left - margins.left - ctx.center.x
-    const dy = clientY - rect.top - margins.top - ctx.center.y
+  const pointerAt = (clientX: number, clientY: number) => {
+    const rect = ref.current?.getBoundingClientRect()
+    if (!rect) return
+    const x = clientX - rect.left
+    const y = clientY - rect.top
+    const dx = x - margins.left - ctx.center.x
+    const dy = y - margins.top - ctx.center.y
     const angle = Math.atan2(dy, dx)
-    const r = Math.hypot(dx, dy)
-    if (chartType === "pie" && ctx.pie) {
-      const inside = r <= ctx.outerRadius && r >= ctx.innerRadius
-      const i = inside ? sliceAtAngle(ctx.pie, angle) : -1
-      ctx.setHoverIndex(i >= 0 ? i : null)
+    const radius = Math.hypot(dx, dy)
+    const inRing = ctx.ready && radius <= ctx.outerRadius && radius >= ctx.innerRadius
+    const slice = inRing && ctx.pie ? sliceAtAngle(ctx.pie, angle) : -1
+    return { x, y, angle, slice }
+  }
+
+  const onMove = (clientX: number, clientY: number) => {
+    const pointer = pointerAt(clientX, clientY)
+    if (!pointer) return
+    if (ctx.pie) {
+      ctx.setHoverIndex(pointer.slice >= 0 ? pointer.slice : null)
     } else if (ctx.radar) {
-      ctx.setHoverIndex(axisAtAngle(ctx.radar.axes, angle))
+      ctx.setHoverIndex(axisAtAngle(ctx.radar.axes, pointer.angle))
     }
-    ctx.setCursor(clientX - rect.left, clientY - rect.top)
+    ctx.setCursor(pointer.x, pointer.y)
   }
 
   return (
@@ -129,9 +141,14 @@ export function PolarRoot<TData extends Row>({
       <CommonChartContext value={ctx.common}>
         <div
           ref={ref}
-          className={cn("relative h-full w-full", className)}
+          className={cn("relative h-full w-full", onSlicePress && ctx.hoverIndex !== null && "cursor-pointer", className)}
           onPointerEnter={() => ctx.setMouseInChart(true)}
           onPointerMove={(e) => onMove(e.clientX, e.clientY)}
+          onClick={onSlicePress ? (e) => {
+            const pointer = pointerAt(e.clientX, e.clientY)
+            const slice = pointer ? ctx.pie?.[pointer.slice] : undefined
+            if (slice) onSlicePress(slice.name)
+          } : undefined}
           onPointerLeave={() => {
             ctx.setMouseInChart(false)
             ctx.setHoverIndex(null)

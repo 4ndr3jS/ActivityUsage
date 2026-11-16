@@ -1,6 +1,6 @@
 import type { AppRoute, EngineStatus } from "../../shared/desktop-api";
 import { useLayoutEffect, useRef } from "react";
-import { DayIcon, DeviceActivityIcon, InsightsIcon, PulseIcon, SettingsIcon, StatisticsIcon, TrendsIcon } from "../icons";
+import { DayIcon, InsightsIcon, PulseIcon, SettingsIcon, StatisticsIcon, TrendsIcon } from "../icons";
 
 interface AppShellProps {
   route: AppRoute;
@@ -21,7 +21,6 @@ const primaryNavigation: Array<{
 }> = [
   { route: "day", label: "Today", icon: DayIcon },
   { route: "trends", label: "History", icon: TrendsIcon },
-  { route: "activity", label: "Breakdown", icon: DeviceActivityIcon },
   { route: "statistics", label: "Statistics", icon: StatisticsIcon },
   { route: "insights", label: "Insights", icon: InsightsIcon },
   { route: "sources", label: "Sources", icon: PulseIcon }
@@ -30,7 +29,6 @@ const primaryNavigation: Array<{
 const routeTitles: Record<AppRoute, string> = {
   day: "Today",
   trends: "History",
-  activity: "Breakdown",
   statistics: "Statistics",
   insights: "Insights",
   sources: "Sources",

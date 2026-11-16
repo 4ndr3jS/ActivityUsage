@@ -2,7 +2,7 @@ import type { DashboardSnapshot } from "@activityusage/contracts";
 import type { GrowthEvent, GrowthEventProperties } from "./growth-events";
 import type { ProviderCredential, ProviderCredentialStatus, QuotaProviderId } from "./quota-providers";
 
-export type AppRoute = "day" | "trends" | "insights" | "limits" | "alerts" | "profile" | "settings" | "diagnostics" | "activity" | "statistics" | "sources";
+export type AppRoute = "day" | "trends" | "insights" | "limits" | "alerts" | "profile" | "settings" | "diagnostics" | "statistics" | "sources";
 export type EngineStatus = "starting" | "ready" | "degraded" | "stopped";
 
 export interface ActivityWatchRange {

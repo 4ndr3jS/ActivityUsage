@@ -750,6 +750,7 @@
 
 .atlas-toolbar :is(.button--secondary, .button--tertiary),
 .activity-period-controls :is(.atlas-toolbar-icon, .atlas-period-trigger),
+.activity-statistics__filter .atlas-period-trigger,
 .atlas-toolbar .select__trigger {
   background: var(--atlas-glass-sheen), var(--atlas-material-thin);
   box-shadow: var(--atlas-ring);
@@ -762,6 +763,7 @@
 
 .atlas-toolbar :is(.button--secondary, .button--tertiary):hover,
 .activity-period-controls :is(.atlas-toolbar-icon, .atlas-period-trigger)[data-hovered],
+.activity-statistics__filter .atlas-period-trigger[data-hovered],
 .atlas-toolbar .select__trigger:hover {
   background: var(--atlas-glass-sheen), color-mix(in oklch, var(--surface-secondary) 70%, transparent);
   box-shadow: var(--atlas-ring-hover);
