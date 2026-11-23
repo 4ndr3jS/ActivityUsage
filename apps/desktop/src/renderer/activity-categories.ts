@@ -10,6 +10,8 @@ const WEB = ["Web Browsing"];
 const UNCATEGORIZED = ["Uncategorized"];
 
 const CLASSROOM_BOOK = /^(?:classroom[\s_+]+of[\s_+]+the[\s_+]+elite|cote)(?:[\s_.,:–—-]*(?:(?:year|y)[\s_]*\d+[\s_.,:–—-]*)?(?:volume|vol\.?|v|chapter|ch\.?)[\s_]*\d+(?:\.\d+)?(?:-dark)?)?(?:\.(?:pdf|epub))?$/i;
+const ANIME_ANYWAY_VOLUME_PAGE = /^animeanyway\.com\/y\d+v\d+(?:\.\d+)?(?:\/|$)/i;
+const ANIME_ANYWAY_VOLUME_TITLE = /^(?:(?:chapter\s+\d+(?:\.\d+)?|prologue|epilogue|interlude|afterword)\s*\|\s*)?year\s+\d+\s+volume\s+\d+(?:\.\d+)?\s*\|\s*anime anyway$/i;
 const SPOTIFY_SITE = /(?:^|\.)spotify\.com$/i;
 const SPOTIFY_TITLE = /^(?:spotify(?:\s+premium|\s+free)?|open\.spotify\.com)$|^spotify\s*[-–—]\s*web player\b|\|\s*spotify$/i;
 const MANGA_SITE = /(?:^|\.)(?:mangafire|comix)\.to$/i;
@@ -68,7 +70,9 @@ export function classifyActivity(
 
   const phoneFiles = event.device === "phone" && app === "My Files";
   const reader = isPdfReader(event.app);
-  if (/(?:^|\.)classroomoftheelite\.net$/i.test(site) ||
+  const animeAnywayVolume = browser && (ANIME_ANYWAY_VOLUME_PAGE.test(tab?.page ?? "") ||
+    ((!site || site === "animeanyway.com") && titles.some(value => ANIME_ANYWAY_VOLUME_TITLE.test(value))));
+  if (animeAnywayVolume || /(?:^|\.)classroomoftheelite\.net$/i.test(site) ||
     ((browser || reader || phoneFiles || filename) && titles.some(value => CLASSROOM_BOOK.test(value)))) {
     return { path: CLASSROOM, app };
   }

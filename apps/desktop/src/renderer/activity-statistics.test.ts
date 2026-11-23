@@ -166,6 +166,40 @@ it("groups game variants and keeps specific activities ahead of generic web brow
   expect(rankActivity(stats).titles).toEqual([]);
 });
 
+it("classifies Anime Anyway volume pages as Classroom of the Elite by URL or recorded title", () => {
+  const tabBucket = "aw-watcher-web-brave_pc";
+  const bucket = (id: string, type: string) =>
+    ({ id, type, hostname: "pc", device: "computer" as const, lastUpdated: null, eventCount: 0, error: null });
+  const onSite = "animeanyway.com";
+  const context = {
+    buckets: [bucket("computer", "currentwindow"), bucket(tabBucket, "web.tab.current")],
+    tabs: [
+      { timestamp: new Date(+start + 120_000).toISOString(), duration: 60, bucketId: tabBucket,
+        title: null, browser: null, site: onSite, page: `${onSite}/y3v5/ch2` },
+      { timestamp: new Date(+start + 180_000).toISOString(), duration: 60, bucketId: tabBucket,
+        title: "SignIn | Anime Anyway", browser: null, site: onSite, page: `${onSite}/signin` },
+      { timestamp: new Date(+start + 240_000).toISOString(), duration: 60, bucketId: tabBucket,
+        title: "Classroom of the Elite Year 3 Volume 5 - Google Search", browser: null, site: "google.com", page: "google.com/search" }
+    ]
+  };
+  const stats = buildActivityStatistics([
+    event(0, 60, "brave.exe", "Chapter 1 | Year 3 Volume 5 | Anime Anyway - Brave"),
+    event(1, 60, "brave.exe", "Prologue | Year 3 Volume 5 | Anime Anyway - Brave"),
+    event(2, 60, "brave.exe", "Continue reading - Brave"),
+    event(3, 60, "brave.exe", "SignIn | Anime Anyway - Brave"),
+    event(4, 60, "brave.exe", "Classroom of the Elite Year 3 Volume 5 - Google Search - Brave"),
+    event(5, 60, "brave.exe", "Anime Anyway Translations - Brave")
+  ], [], period, true, true, context);
+
+  const classroom = stats.categoriesById.get('["Reading","Classroom of the Elite"]')!;
+  const browsing = stats.categoriesById.get('["Web Browsing"]')!;
+  expect(classroom.seconds).toBe(180);
+  expect(browsing.seconds).toBe(180);
+  expect(rankActivity(stats, [classroom]).titles.map(row => row.label)).toEqual([
+    "Chapter 1 | Year 3 Volume 5 | Anime Anyway", "Prologue | Year 3 Volume 5 | Anime Anyway", "Continue reading"
+  ]);
+});
+
 it("attributes Spotify on both devices and matching browser time to one app with a full title breakdown", () => {
   const bucket = (id: string, type: string) =>
     ({ id, type, hostname: "pc", device: "computer" as const, lastUpdated: null, eventCount: 0, error: null });
