@@ -72,7 +72,10 @@ export function classifyActivity(
   const reader = isPdfReader(event.app);
   const animeAnywayVolume = browser && (ANIME_ANYWAY_VOLUME_PAGE.test(tab?.page ?? "") ||
     ((!site || site === "animeanyway.com") && titles.some(value => ANIME_ANYWAY_VOLUME_TITLE.test(value))));
-  if (animeAnywayVolume || /(?:^|\.)classroomoftheelite\.net$/i.test(site) ||
+  // Android Chrome can report just the domain, with no path or page title.
+  const animeAnywayPhone = event.device === "phone" && browser === "chrome" &&
+    site === "animeanyway.com" && tab?.page === site && !titles.length;
+  if (animeAnywayVolume || animeAnywayPhone || /(?:^|\.)classroomoftheelite\.net$/i.test(site) ||
     ((browser || reader || phoneFiles || filename) && titles.some(value => CLASSROOM_BOOK.test(value)))) {
     return { path: CLASSROOM, app };
   }

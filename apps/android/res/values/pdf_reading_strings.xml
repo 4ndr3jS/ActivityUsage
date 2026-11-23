@@ -1,3 +1,4 @@
 <resources>
   <string name="pdf_reading_description">Records the filename and viewing time in Samsung Notes’ PDF reader while your phone is unlocked. Sends those records to ActivityWatch on this phone for sync with your computer.</string>
+  <string name="chrome_reading_description">Records Classroom of the Elite page titles and reading time from Anime Anyway in Chrome while your phone is unlocked. Saves them locally to ActivityWatch for sync with your computer.</string>
 </resources>

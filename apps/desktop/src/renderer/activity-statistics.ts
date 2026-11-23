@@ -137,10 +137,13 @@ export function buildActivityStatistics(
       if (showTitles) {
         const windowTitle = title && path[0] === "Games" ? windowTitleLabel(title, app) : title;
         const recorded = filename ?? windowTitle ?? tab?.title ?? tab?.pdfFilename;
+        const siteLabel = path[1] === "Classroom of the Elite" && tab?.site === "animeanyway.com"
+          ? "Anime Anyway · page title unavailable" : undefined;
         const label = recorded && app === "Spotify" && /^spotify(?: premium| free|\s*[-–—]\s*web player)?$/i.test(recorded)
-          ? `${recorded} · no track title` : recorded || "No window title recorded";
-        addRank(group.titles, JSON.stringify([app, label, !recorded]), {
-          label, app, seconds, ...(recorded ? {} : { unrecordedTitle: true })
+          ? `${recorded} · no track title` : recorded ?? siteLabel ?? "No window title recorded";
+        const unrecordedTitle = !recorded && !siteLabel;
+        addRank(group.titles, JSON.stringify([app, label, unrecordedTitle]), {
+          label, app, seconds, ...(unrecordedTitle ? { unrecordedTitle: true } : {})
         });
       }
     }

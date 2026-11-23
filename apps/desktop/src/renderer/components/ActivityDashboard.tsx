@@ -586,7 +586,14 @@ function ActivitySettingsView({ showTitles, includeLabels, autoRefresh, onShowTi
     {android && <section className="activity-glass-card activity-privacy-card">
       <h2>PDF reading</h2>
       <p className="activity-explainer">Record the filename and viewing time in Samsung Notes’ PDF reader. ActivityWatch sync sends these records to your computer.</p>
-      <button className="activity-button android-reconnect" type="button" onClick={() => android.openPdfTrackingSettings()}>
+      <button className="activity-button android-reconnect" type="button" onClick={() => android.openAccessibilitySettings()}>
+        Open accessibility settings
+      </button>
+    </section>}
+    {android && <section className="activity-glass-card activity-privacy-card">
+      <h2>Chrome reading</h2>
+      <p className="activity-explainer">Enable Activity Usage Chrome reading to record Classroom of the Elite page titles from Anime Anyway.</p>
+      <button className="activity-button android-reconnect" type="button" onClick={() => android.openAccessibilitySettings()}>
         Open accessibility settings
       </button>
     </section>}

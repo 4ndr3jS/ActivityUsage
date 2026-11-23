@@ -200,6 +200,40 @@ it("classifies Anime Anyway volume pages as Classroom of the Elite by URL or rec
   ]);
 });
 
+it("counts untitled phone Anime Anyway visits and prefers captured chapter titles where available", () => {
+  const tabBucket = "aw-watcher-android-web-synced-from-samsung";
+  const titleBucket = "aw-watcher-anime-anyway-android_abc-synced-from-samsung";
+  const bucket = (id: string, type: string, hostname = "samsung") =>
+    ({ id, type, hostname, device: "phone" as const, lastUpdated: null, eventCount: 0, error: null });
+  const chrome = "com.android.chrome";
+  const site = "animeanyway.com";
+  const chapter = "Chapter 1 | Year 3 Volume 5 | Anime Anyway";
+  const tab = (second: number, duration: number, bucketId: string, page: string, title: string | null = null) =>
+    ({ timestamp: new Date(+start + second * 1000).toISOString(), duration, bucketId, browser: chrome,
+      site: page.split("/")[0], page, title });
+  const context = {
+    buckets: [bucket("phone", "currentwindow"), bucket(tabBucket, "web.tab.current"),
+      bucket(titleBucket, "web.tab.current"), bucket("other-phone", "web.tab.current", "other")],
+    tabs: [
+      tab(0, 20, tabBucket, site),
+      tab(25, 10, tabBucket, site),
+      tab(24, 8, titleBucket, site, chapter),
+      tab(35, 10, tabBucket, `${site}/signin`),
+      tab(45, 10, tabBucket, "example.com"),
+      tab(45, 10, "other-phone", site, chapter)
+    ]
+  };
+  const stats = buildActivityStatistics([event(0, 60, chrome, null, "phone")], [], period, true, true, context);
+  const classroom = stats.categoriesById.get('["Reading","Classroom of the Elite"]')!;
+  expect(stats.total).toBe(60);
+  expect(classroom.seconds).toBe(31);
+  expect(stats.categoriesById.get('["Web Browsing"]')?.seconds).toBe(29);
+  expect(rankActivity(stats, [classroom]).titles).toEqual([
+    { label: "Anime Anyway · page title unavailable", app: "Google Chrome", seconds: 23 },
+    { label: chapter, app: "Google Chrome", seconds: 8 }
+  ]);
+});
+
 it("attributes Spotify on both devices and matching browser time to one app with a full title breakdown", () => {
   const bucket = (id: string, type: string) =>
     ({ id, type, hostname: "pc", device: "computer" as const, lastUpdated: null, eventCount: 0, error: null });

@@ -20,6 +20,7 @@ export interface ActivitySpan {
 
 interface TabInterval extends ActivityWatchTab, ActivitySpan {
   host: string;
+  chapterTitle: boolean;
 }
 
 const BROWSERS: Record<string, string> = {
@@ -103,7 +104,10 @@ export function createBrowserTabMatcher(events: ActivityWatchRecord[], tabs: Act
     let intervals = tabsByBrowser.get(key);
     if (!intervals) tabsByBrowser.set(key, intervals = []);
     const start = Date.parse(tab.timestamp);
-    intervals.push({ ...tab, start, end: start + tab.duration * 1000, host: browserHostname(source) });
+    intervals.push({
+      ...tab, start, end: start + tab.duration * 1000, host: browserHostname(source),
+      chapterTitle: Boolean(tab.title && source.id.startsWith("aw-watcher-anime-anyway-android_"))
+    });
   }
   const indexes = new Map([...tabsByBrowser].map(([key, intervals]) => [key, indexActivitySpans(intervals)]));
 
@@ -114,9 +118,10 @@ export function createBrowserTabMatcher(events: ActivityWatchRecord[], tabs: Act
     const key = `${event.device}:${browser}`;
     const host = browserHostname(source);
     const overlaps = indexes.get(key)?.(start, end) ?? [];
-    // Prefer the matching host, then the latest tab when watchers overlap.
+    // The Android chapter watcher carries a page title even when the browser watcher only sees a domain.
     return overlaps.filter(tab => tab.host ? tab.host === host : hostsByBrowser.get(key)?.size === 1)
-      .sort((a, b) => Number(Boolean(b.host)) - Number(Boolean(a.host)) || b.start - a.start);
+      .sort((a, b) => Number(Boolean(b.host)) - Number(Boolean(a.host)) ||
+        Number(b.chapterTitle) - Number(a.chapterTitle) || b.start - a.start);
   };
 }
 

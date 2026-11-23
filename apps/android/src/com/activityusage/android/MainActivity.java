@@ -147,7 +147,7 @@ public final class MainActivity extends Activity {
         }
 
         @JavascriptInterface
-        public void openPdfTrackingSettings() {
+        public void openAccessibilitySettings() {
             runOnUiThread(() -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
         }
 
