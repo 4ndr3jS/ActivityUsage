@@ -1,6 +1,8 @@
 // Labels are presentation only; ActivityWatch's source records remain intact.
 const APP_NAMES: Record<string, string> = {
-  brave: "Brave", chrome: "Google Chrome", msedge: "Microsoft Edge", firefox: "Firefox",
+  brave: "Brave", bravebrowser: "Brave", chrome: "Google Chrome", msedge: "Microsoft Edge", firefox: "Firefox",
+  "com.brave.browser": "Brave", "com.spotify.music": "Spotify", "com.google.android.googlequicksearchbox": "Google",
+  "com.sec.android.app.myfiles": "My Files", "com.samsung.android.app.notes": "Samsung Notes",
   explorer: "File Explorer", windowsterminal: "Windows Terminal", powershell: "PowerShell",
   pwsh: "PowerShell", cmd: "Command Prompt", code: "Visual Studio Code",
   chatgpt: "ChatGPT", activityusage: "Activity Usage", rocketleague: "Rocket League", rocketleagueeac: "Rocket League",
@@ -21,6 +23,8 @@ export function appLabel(raw: string | null): string {
   let name = raw.trim().split(/[\\/]/).pop()!;
   const executable = /\.(exe|app|bin|desktop|com|tmp)$/i.test(name);
   name = name.replace(/(?:\.(?:exe|app|bin|desktop|com|tmp))+$/i, "");
+  const packageLabel = APP_NAMES[name.toLowerCase()];
+  if (typeof packageLabel === "string") return packageLabel;
   // Android package IDs sometimes arrive without an app's friendly label.
   if (/^(com|org|net|io)\.[\w.]+$/.test(name)) name = name.split('.').pop()!;
   if (/^fortnite(?:client)?(?:$|[-_ ])/i.test(name)) return "Fortnite";

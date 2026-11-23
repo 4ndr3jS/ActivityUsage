@@ -2,14 +2,16 @@ import type {
   ActivityDevice,
   ActivityWatchBucket,
   ActivityWatchCategory,
+  ActivityWatchPdf,
   ActivityWatchRange,
   ActivityWatchRecord,
   ActivityWatchSnapshot,
   ActivityWatchTab
 } from "./desktop-api";
-import { pageAddress } from "./browser-page";
+import { isPdfFilename, pageAddress, pdfFilenameFromUrl } from "./browser-page";
 
 const ACTIVITYWATCH_API = "http://127.0.0.1:5600/api/0";
+const PDF_BUCKET_TYPE = "document.pdf.current";
 const MAX_RANGE_MS = 366 * 24 * 60 * 60 * 1000;
 
 interface RawBucket extends Record<string, unknown> {
@@ -29,6 +31,7 @@ interface BucketReadResult {
   bucket: ActivityWatchBucket;
   events: ActivityWatchRecord[];
   tabs: ActivityWatchTab[];
+  pdfs: ActivityWatchPdf[];
 }
 
 export async function readActivityWatchData(value: unknown, api = ACTIVITYWATCH_API): Promise<ActivityWatchSnapshot> {
@@ -42,7 +45,8 @@ export async function readActivityWatchData(value: unknown, api = ACTIVITYWATCH_
       ? Object.values(bucketPayload)
       : [];
   const buckets = rawBuckets.filter(isRecord).map(bucket => bucket as RawBucket).filter(bucket => typeof bucket.id === "string");
-  const sources = buckets.filter(bucket => isTrackedBucket(bucket) || (range.includeBrowserTabs && isTabBucket(bucket)));
+  const sources = buckets.filter(bucket => isTrackedBucket(bucket) ||
+    (range.includeBrowserTabs && (isTabBucket(bucket) || isPdfBucket(bucket))));
   const results = await Promise.all(sources.map(bucket => readBucket(api, bucket, start, end, range.includeBrowserTabs === true)));
 
   return {
@@ -50,7 +54,8 @@ export async function readActivityWatchData(value: unknown, api = ACTIVITYWATCH_
     fetchedAt: new Date().toISOString(),
     buckets: results.map(result => result.bucket),
     events: results.flatMap(result => result.events).sort((left, right) => Date.parse(left.timestamp) - Date.parse(right.timestamp)),
-    tabs: results.flatMap(result => result.tabs)
+    tabs: results.flatMap(result => result.tabs),
+    ...(range.includeBrowserTabs ? { pdfs: results.flatMap(result => result.pdfs) } : {})
   };
 }
 
@@ -103,7 +108,12 @@ async function requestJson(url: string): Promise<unknown> {
   return response.json() as Promise<unknown>;
 }
 
+function isPdfBucket(bucket: RawBucket): boolean {
+  return bucket.type === PDF_BUCKET_TYPE;
+}
+
 function isTrackedBucket(bucket: RawBucket): boolean {
+  if (isPdfBucket(bucket) || isTabBucket(bucket)) return false;
   const id = asString(bucket.id) ?? "";
   const type = asString(bucket.type) ?? "";
   return /currentwindow|aw-watcher-android|android/i.test(`${id} ${type}`);
@@ -125,28 +135,35 @@ async function readBucket(api: string, bucket: RawBucket, start: number | null, 
 
   try {
     const payload = await requestJson(`${api}/buckets/${encodeURIComponent(id)}/events?${query.toString()}`);
-    if (!Array.isArray(payload)) return { bucket: { ...base, error: "ActivityWatch returned an unexpected event format." }, events: [], tabs: [] };
+    if (!Array.isArray(payload)) return { bucket: { ...base, error: "ActivityWatch returned an unexpected event format." }, events: [], tabs: [], pdfs: [] };
     const events: ActivityWatchRecord[] = [];
     const tabs: ActivityWatchTab[] = [];
+    const pdfs: ActivityWatchPdf[] = [];
     const keepEvents = isTrackedBucket(bucket);
     const keepTabs = includeBrowserTabs && isTabBucket(bucket);
+    const keepPdfs = includeBrowserTabs && isPdfBucket(bucket) && device === "phone";
     for (const row of payload) {
       if (!isRecord(row)) continue;
       const record = normalizeEvent(row, id, device, start, end);
       if (!record) continue;
       if (keepEvents) events.push(record);
+      const data = isRecord(row.data) ? row.data : {};
+      if (keepPdfs && typeof data.filename === "string" && isPdfFilename(data.filename)) {
+        pdfs.push({ timestamp: record.timestamp, duration: record.duration, bucketId: id, filename: data.filename });
+      }
       if (keepTabs) {
-        const data = isRecord(row.data) ? row.data : {};
-        const address = pageAddress(asString(data.url));
+        const url = asString(data.url);
+        const address = pageAddress(url);
+        const pdfFilename = pdfFilenameFromUrl(url);
         if (address) tabs.push({
           ...address, timestamp: record.timestamp, duration: record.duration, bucketId: id,
-          browser: firstString(data.browser), title: record.title
+          browser: firstString(data.browser), title: record.title, ...(pdfFilename ? { pdfFilename } : {})
         });
       }
     }
-    return { bucket: { ...base, eventCount: keepTabs ? tabs.length : events.length }, events, tabs };
+    return { bucket: { ...base, eventCount: keepPdfs ? pdfs.length : keepTabs ? tabs.length : events.length }, events, tabs, pdfs };
   } catch {
-    return { bucket: { ...base, error: "Could not read events from this watcher." }, events: [], tabs: [] };
+    return { bucket: { ...base, error: "Could not read events from this watcher." }, events: [], tabs: [], pdfs: [] };
   }
 }
 

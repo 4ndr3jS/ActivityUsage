@@ -131,7 +131,7 @@ final class LocalWebViewClient extends WebViewClient {
         }
     }
 
-    private static HttpURLConnection open(String endpoint, String key) throws IOException {
+    static HttpURLConnection open(String endpoint, String key) throws IOException {
         HttpURLConnection connection = (HttpURLConnection) new URL(API_ROOT + endpoint).openConnection();
         connection.setConnectTimeout(3000);
         connection.setReadTimeout(10_000);

@@ -1,10 +1,11 @@
 import { Button, Popover } from "@heroui/react";
 import { useMemo, useRef, useState } from "react";
-import { rankActivity, type ActivityStatistics as Statistics, type CategoryTotal } from "../activity-statistics";
+import { directCategoryColor, directCategoryTime, rankActivity, type ActivityStatistics as Statistics, type CategoryTotal } from "../activity-statistics";
 import { CheckIcon, ChevronDownIcon, ChevronRightIcon } from "../icons";
+import { todayDay } from "../personal-analytics";
 import { Bar } from "./dither-kit/bar";
 import { BarChart } from "./dither-kit/bar-chart";
-import type { ChartConfig } from "./dither-kit/chart-context";
+import { useChartPart, type ChartConfig } from "./dither-kit/chart-context";
 import { Grid } from "./dither-kit/grid";
 import { rgb } from "./dither-kit/palette";
 import { Pie } from "./dither-kit/pie";
@@ -17,46 +18,51 @@ import "./activity-statistics.css";
 const RANK_PAGE_SIZE = 6;
 const percent = new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 1 });
 
-export function ActivityStatistics({ stats, ...props }: {
-  stats: Statistics | null;
+interface StatisticsControls {
   hourly: boolean;
   allDevices: boolean;
   rulesFailed: boolean;
   showTitles: boolean;
   onToggleTitles(): void;
-}): React.JSX.Element {
+  onSelectDay(day: string): void;
+  onReturnToRange?(): void;
+}
+
+export function ActivityStatistics({ stats, ...props }: StatisticsControls & { stats: Statistics | null }): React.JSX.Element {
   if (!stats) return <div className="activity-loading" role="status"><span className="activity-spinner" />Preparing activity statistics…</div>;
   return <StatisticsContent stats={stats} {...props} />;
 }
 
-function StatisticsContent({ stats, hourly, allDevices, rulesFailed, showTitles, onToggleTitles }: {
-  stats: Statistics; hourly: boolean; allDevices: boolean; rulesFailed: boolean; showTitles: boolean; onToggleTitles(): void;
-}): React.JSX.Element {
-  const [categoryId, setCategoryId] = useState("");
+function StatisticsContent({ stats, hourly, allDevices, rulesFailed, showTitles, onToggleTitles, onSelectDay, onReturnToRange }:
+  StatisticsControls & { stats: Statistics }): React.JSX.Element {
+  const [categoryChoice, setCategoryChoice] = useState<CategoryTotal | null>(null);
   const [appName, setAppName] = useState<string | null>(null);
   const options = useMemo(() => flattenCategories(stats.categories), [stats.categories]);
-  const distribution = useMemo(() => stats.categories.map(asChartCategory), [stats.categories]);
-  const selectedCategory = stats.categoriesById.get(categoryId);
+  const selectedCategory = useMemo(() => {
+    if (!categoryChoice) return undefined;
+    return stats.categoriesById.get(categoryChoice.id)
+      ?? (onReturnToRange ? { ...categoryChoice, seconds: 0, children: [] } : undefined);
+  }, [categoryChoice, stats.categoriesById, onReturnToRange]);
   const selected = useMemo(() => selectedCategory ? asChartCategory(selectedCategory) : undefined, [selectedCategory]);
-  const selectedRootId = selectedCategory ? JSON.stringify(selectedCategory.path.slice(0, 1)) : null;
-  const timelineGroups = useMemo(() => selected ? [selected] : distribution, [selected, distribution]);
+  const parent = selectedCategory && stats.categoriesById.get(JSON.stringify(selectedCategory.path.slice(0, -1)));
+  const groups = useMemo(() => chartGroups(stats.categories, selectedCategory), [stats.categories, selectedCategory]);
   const ranks = useMemo(() => rankActivity(stats, selectedCategory ? [selectedCategory] : []), [stats, selectedCategory]);
   const filteredApp = ranks.apps.some(row => row.label === appName) ? appName : null;
-  const titles = useMemo(() => filteredApp ? ranks.titles.filter(row => row.app === filteredApp) : ranks.titles, [filteredApp, ranks.titles]);
+  const titles = useMemo(() => ranks.titles.filter(row => filteredApp ? row.app === filteredApp : !row.unrecordedTitle), [filteredApp, ranks.titles]);
   const message = rulesFailed ? "Couldn’t load the latest category rules from ActivityWatch."
-    : stats.unsupportedRules > 0 ? `${stats.unsupportedRules} category ${stats.unsupportedRules === 1 ? "rule could" : "rules could"} not be read.`
-    : !stats.hasRules ? "Set category rules in ActivityWatch to group recorded time." : null;
+    : stats.unsupportedRules > 0 ? `${stats.unsupportedRules} category ${stats.unsupportedRules === 1 ? "rule could" : "rules could"} not be read.` : null;
 
   function chooseCategory(id: string): void {
-    setCategoryId(id);
+    setCategoryChoice(stats.categoriesById.get(id) ?? null);
     setAppName(null);
   }
 
   return <div className="activity-statistics">
     <div className="activity-statistics__charts">
-      <CategoryTimeline stats={stats} groups={timelineGroups} selected={selected} hourly={hourly} allDevices={allDevices} />
-      <CategoryMix total={stats.total} categories={stats.categories} groups={distribution} selected={selected} rootId={selectedRootId}
-        onSelect={id => chooseCategory(selected?.id === id ? "" : id)} onClear={() => chooseCategory("")} />
+      <CategoryTimeline stats={stats} groups={groups} selected={selectedCategory} hourly={hourly} allDevices={allDevices}
+        onSelectDay={onSelectDay} onReturnToRange={onReturnToRange} />
+      <CategoryMix total={selected?.seconds ?? stats.total} groups={groups} selected={selected} parentLabel={parent?.path.at(-1)}
+        onSelect={chooseCategory} onBack={() => chooseCategory(parent?.id ?? "")} />
     </div>
     {message && <p className="activity-statistics__status" role="status">{message}</p>}
     <div className="activity-statistics__detail-heading">
@@ -67,7 +73,7 @@ function StatisticsContent({ stats, hourly, allDevices, rulesFailed, showTitles,
       <section className="activity-glass-card activity-stat-card">
         <header className="activity-stat-card__heading"><div><h3>Category tree</h3><p>Category totals include subcategories.</p></div></header>
         {stats.categories.length ? <CategoryTree categories={stats.categories} selected={selectedCategory}
-          onSelect={id => chooseCategory(selected?.id === id ? "" : id)} />
+          onSelect={id => chooseCategory(selected?.id === id ? parent?.id ?? "" : id)} />
           : <p className="activity-stat-card__empty">No categories in this period.</p>}
       </section>
       <RankCard key={`apps-${selected?.id ?? ""}`} title="Top applications" subtitle={selected?.label} rows={ranks.apps}
@@ -84,45 +90,65 @@ interface ChartCategory {
   label: string;
   color: CategoryTotal["color"];
   seconds: number;
+  direct?: true;
 }
 
 function asChartCategory(category: CategoryTotal): ChartCategory {
   return { id: category.id, label: category.path.join(" › "), color: category.color, seconds: category.seconds };
 }
 
+function chartGroups(roots: CategoryTotal[], selected?: CategoryTotal): ChartCategory[] {
+  if (!selected) return roots.map(asChartCategory);
+  if (!selected.children.length) return [asChartCategory(selected)];
+  const groups = selected.children.map(child => ({ ...asChartCategory(child), label: child.path.at(-1)! }));
+  const direct = directCategoryTime(selected);
+  if (!direct) return groups;
+  return [...groups, {
+    ...asChartCategory(selected), label: `Other ${selected.path.at(-1)} activity`,
+    color: directCategoryColor(selected), seconds: direct, direct: true
+  }];
+}
+
 function chartConfig(groups: ChartCategory[]): ChartConfig {
   return Object.fromEntries(groups.map(group => [group.id, { label: group.label, color: group.color }]));
 }
 
-function CategoryTimeline({ stats, groups, selected, hourly, allDevices }: {
-  stats: Statistics; groups: ChartCategory[]; selected?: ChartCategory; hourly: boolean; allDevices: boolean;
+function CategoryTimeline({ stats, groups, selected, hourly, allDevices, onSelectDay, onReturnToRange }: {
+  stats: Statistics; groups: ChartCategory[]; selected?: CategoryTotal; hourly: boolean; allDevices: boolean;
+  onSelectDay(day: string): void; onReturnToRange?(): void;
 }): React.JSX.Element {
   const config = useMemo(() => chartConfig(groups), [groups]);
   const rows = useMemo(() => stats.periods.map((period): { key: number; label: string; [key: string]: number | string } => ({
     key: period.start, label: period.label,
     ...Object.fromEntries(groups.map(group => [
-      group.id, period.totals.get(group.id) ?? 0
+      group.id, group.direct && selected ? directCategoryTime(selected, period.totals) : period.totals.get(group.id) ?? 0
     ]))
-  })), [groups, stats.periods]);
+  })), [groups, selected, stats.periods]);
   const view = hourly ? "By hour" : stats.periods.some(period => period.label.includes(" – ")) ? "By date range" : "By day";
   const total = selected?.seconds ?? stats.total;
-  return <section className="activity-glass-card activity-stat-card">
+  const periodKey = `${stats.periods[0]?.start}:${stats.periods.at(-1)?.end}:${hourly}`;
+
+  return <section className="activity-glass-card activity-stat-card activity-stat-timeline-card">
     <header className="activity-stat-card__heading">
-      <div><h3>Category timeline</h3><p>{selected ? `${selected.label} · ${view.toLowerCase()}` : view}{allDevices && " · Computer and phone time are added"}</p></div>
-      <strong>{formatTime(total)}</strong>
+      <div><h3>Category timeline</h3><p>{selected ? `${selected.path.join(" › ")} · ${view.toLowerCase()}` : view}{allDevices && " · Computer and phone time are added"}</p></div>
+      <div className="activity-stat-timeline__summary">
+        <strong>{formatTime(total)}</strong>
+        {onReturnToRange && <button className="activity-stat-card__action" type="button" onClick={onReturnToRange}>Back to range</button>}
+      </div>
     </header>
-    <div className="activity-chart-plot activity-stat-timeline" role="group" aria-label="Recorded time by category">
-      {total > 0 ? <BarChart data={rows} config={config} stackType="stacked" animate={false}
+    <div key={periodKey} className="activity-chart-plot activity-stat-timeline" role="group" aria-label="Recorded time by category">
+      {rows.length ? <BarChart data={rows} config={config} stackType="stacked" animate={false}
         margins={{ top: 18, right: 25, bottom: 30, left: 51 }}>
         <Grid /><XAxis dataKey="label" maxTicks={7} minTickSpacing={85} /><YAxis tickFormatter={formatTime} tickCount={4} />
         {groups.map(group => <Bar key={group.id} dataKey={group.id} variant="solid" />)}
-        <Tooltip labelKey="label" valueFormatter={formatTime} variant="frosted-glass" />
+        {!hourly && <DailyBarActions periods={stats.periods} onSelectDay={onSelectDay} />}
+        <Tooltip labelKey="label" valueFormatter={formatTime} variant="frosted-glass" hideZeroValues />
       </BarChart> : <div className="activity-chart-empty"><span>No recorded activity</span></div>}
     </div>
     {total > 0 && <details className="activity-chart-values">
       <summary>View chart values</summary>
       <div><table><thead><tr><th scope="col">Period</th>{groups.map(group => <th key={group.id} scope="col">{group.label}</th>)}</tr></thead>
-        <tbody>{rows.map(row => <tr key={row.key}><th scope="row">{row.label}</th>
+        <tbody>{rows.map(row => <tr key={`${row.key}:${row.label}`}><th scope="row">{row.label}</th>
           {groups.map(group => {
             const value = Number(row[group.id]);
             return <td key={group.id}>{value > 0 ? formatTime(value) : "—"}</td>;
@@ -132,37 +158,58 @@ function CategoryTimeline({ stats, groups, selected, hourly, allDevices }: {
   </section>;
 }
 
-function CategoryMix({ total, categories, groups, selected, rootId, onSelect, onClear }: {
-  total: number; categories: CategoryTotal[]; groups: ChartCategory[]; selected?: ChartCategory; rootId: string | null;
-  onSelect(id: string): void; onClear(): void;
+function DailyBarActions({ periods, onSelectDay }: {
+  periods: Statistics["periods"]; onSelectDay(day: string): void;
+}): React.JSX.Element | null {
+  const chart = useChartPart("DailyBarActions", "bar");
+  if (!chart.ready) return null;
+  const baseline = chart.y(0);
+  return <>{periods.map((period, index) => {
+    const day = todayDay(new Date(period.start));
+    if (day !== todayDay(new Date(period.end - 1))) return null;
+    const total = Math.max(0, ...chart.configKeys.map(key => chart.bands[key]?.[index]?.[1] ?? 0));
+    const slot = chart.barSlot(index, 0, chart.configKeys.length);
+    const height = Math.max(12, baseline - chart.y(total));
+    return <button key={day} className="activity-stat-timeline__day" type="button" aria-label={`Show activity for ${period.label}`}
+      style={{ left: chart.margins.left + slot.x, top: chart.margins.top + baseline - height, width: slot.width, height }}
+      onClick={() => onSelectDay(day)} />;
+  })}</>;
+}
+
+DailyBarActions.chartLayer = "dom" as const;
+
+function CategoryMix({ total, groups, selected, parentLabel, onSelect, onBack }: {
+  total: number; groups: ChartCategory[]; selected?: ChartCategory; parentLabel?: string;
+  onSelect(id: string): void; onBack(): void;
 }): React.JSX.Element {
-  const slices = useMemo(() => categories.flatMap(category => [
-    // Children already count toward their parent. Keep their colors available for drill-down.
-    ...flattenCategories(category.children).map(child => ({ ...asChartCategory(child), seconds: 0 })),
-    asChartCategory(category)
-  ]), [categories]);
-  const config = useMemo(() => chartConfig(slices), [slices]);
+  const config = useMemo(() => chartConfig(groups), [groups]);
+  const isLeaf = selected?.id === groups[0]?.id && groups.length === 1;
   return <section className="activity-glass-card activity-stat-card activity-stat-mix">
-    <header className="activity-stat-card__heading"><div><h3>Category share</h3><p>Select a category to filter statistics.</p></div></header>
+    <header className="activity-stat-card__heading"><div><h3>Category share</h3><p>{selected?.label ?? "Select a category to filter statistics."}</p></div></header>
     {total > 0 ? <div className="activity-stat-mix__content">
       <div className="activity-stat-mix__ring">
         <div className="activity-stat-mix__plot" aria-hidden="true">
-          <PieChart config={config} data={slices} dataKey="seconds" nameKey="id" innerRadius={0.70}
-            selectedDataKey={selected?.id ?? null} onSlicePress={selected ? onClear : onSelect}
-            margins={{ top: 6, right: 6, bottom: 6, left: 6 }} animate={false} fillOnSelection><Pie variant="solid" /></PieChart>
+          <PieChart config={config} data={groups} dataKey="seconds" nameKey="id" innerRadius={0.70}
+            onSlicePress={id => { if (isLeaf) onBack(); else if (id !== selected?.id) onSelect(id); }}
+            margins={{ top: 6, right: 6, bottom: 6, left: 6 }} animate={false} expandOnHover={false}><Pie variant="solid" /></PieChart>
         </div>
         {selected
-          ? <button type="button" className="activity-stat-mix__center" aria-label="Clear category filter" onClick={onClear}>
-            <strong>{formatTime(selected.seconds)}</strong><small>Clear filter</small>
+          ? <button type="button" className="activity-stat-mix__center" aria-label={parentLabel ? `Back to ${parentLabel}` : "Clear category filter"} onClick={onBack}>
+            <strong>{formatTime(total)}</strong><small>{parentLabel ? "Back" : "Clear filter"}</small>
           </button>
           : <div className="activity-stat-mix__center"><strong>{formatTime(total)}</strong><small>recorded</small></div>}
       </div>
-      <ul className="activity-stat-mix__legend">{groups.map(group => <li key={group.id}>
-        <button type="button" aria-pressed={rootId === group.id} onClick={() => onSelect(group.id)}>
+      <ul className="activity-stat-mix__legend">{groups.map(group => {
+        const share = group.seconds / total;
+        const content = <>
           <span className="activity-stat-swatch" style={{ backgroundColor: rgb(group.color) }} />
-          <span>{group.label}</span><strong title={formatTime(group.seconds)}>{percent.format(group.seconds / total)}</strong>
-        </button>
-      </li>)}</ul>
+          <span>{group.label}</span><strong title={formatTime(group.seconds)}>{share < 0.0005 ? `<${percent.format(0.001)}` : percent.format(share)}</strong>
+        </>;
+        return <li key={group.id}>{group.id === selected?.id
+          ? <div className="activity-stat-mix__legend-row">{content}</div>
+          : <button type="button" className="activity-stat-mix__legend-row" onClick={() => onSelect(group.id)}>{content}</button>}
+        </li>;
+      })}</ul>
     </div> : <p className="activity-stat-card__empty">No recorded activity.</p>}
   </section>;
 }
@@ -212,9 +259,9 @@ function CategoryTree({ categories, ...props }: CategoryTreeProps & { categories
 function CategoryTreeItem({ category, selected, onSelect }: CategoryTreeProps & { category: CategoryTotal }): React.JSX.Element {
   const [expanded, setExpanded] = useState<boolean>();
   const label = category.path.at(-1);
-  const selectedChild = Boolean(selected && selected.path.length > category.path.length
+  const selectedBranch = Boolean(selected && selected.path.length >= category.path.length
     && category.path.every((part, index) => part === selected.path[index]));
-  const isOpen = expanded ?? selectedChild;
+  const isOpen = expanded ?? selectedBranch;
   return <li>
     <div className="activity-stat-tree__row">
       {category.children.length > 0 && <button className="activity-stat-tree__expand" type="button"
@@ -248,7 +295,7 @@ function RankCard({ title, subtitle, rows, empty, action, hideRows = false, sele
     <header className="activity-stat-card__heading"><div><h3>{title}</h3>{subtitle && <p>{subtitle}</p>}</div>{action}</header>
     {hideRows ? <p className="activity-stat-card__empty">Window titles are hidden by your privacy setting.</p>
       : rows.length ? <>
-        <ol className="activity-stat-rank">{rows.slice(0, limit).map(row => <li key={JSON.stringify([row.app, row.label])}>
+        <ol className="activity-stat-rank">{rows.slice(0, limit).map(row => <li key={JSON.stringify([row.app, row.label, row.unrecordedTitle])}>
           {onSelectRow
             ? <button className="activity-stat-rank__entry" type="button" aria-pressed={selectedRow === row.label}
               aria-label={`Filter window titles by ${row.label}, ${formatTime(row.seconds)}`} onClick={() => onSelectRow(row.label)}>

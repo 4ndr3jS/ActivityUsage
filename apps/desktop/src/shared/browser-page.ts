@@ -18,3 +18,20 @@ export function pageAddress(value: string | null): { site: string; page: string 
   }
   return null;
 }
+
+/** Keep the filename only, including when the browser reports a local path. */
+export function pdfFilenameFromUrl(value: string | null): string | undefined {
+  if (!value) return;
+  try {
+    const url = new URL(value);
+    if (!["file:", "https:", "http:"].includes(url.protocol)) return;
+    const filename = decodeURIComponent(url.pathname.split("/").at(-1) ?? "");
+    return isPdfFilename(filename) ? filename : undefined;
+  } catch {
+    return;
+  }
+}
+
+export function isPdfFilename(value: string): boolean {
+  return value.length > 4 && value.length <= 255 && /\.pdf$/iu.test(value) && !/[\\/\p{Cc}]/u.test(value);
+}

@@ -16,7 +16,7 @@ import { YAxis } from "./dither-kit/y-axis";
 import type { DitherColor } from "./dither-kit/palette";
 import { createActivityPeriod } from "../activity-period";
 import { subscribeActivityRefresh } from "../activity-refresh";
-import { activitySnapshotKey, createActivitySnapshotCache } from "../activity-snapshots";
+import { activitySnapshotKey, coveringActivitySnapshot, createActivitySnapshotCache } from "../activity-snapshots";
 import { appLabel } from "../app-label";
 import { buildActivityStatistics } from "../activity-statistics";
 import { formatPeriodLabel, shiftDay, todayDay, type AnalyticsRange } from "../personal-analytics";
@@ -64,6 +64,9 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   const [wasOverview, setWasOverview] = useState(isOverview);
   const requestVersion = useRef(0);
   const [periodOffset, setPeriodOffset] = useState(0);
+  const [timelineRange, setTimelineRange] = useState<{
+    range: AnalyticsRange; offset: number; key: string; snapshot: ActivityWatchSnapshot;
+  } | null>(null);
   const [device, setDevice] = useState<DeviceFilter>("all");
   const [compare, setCompare] = useState(false);
   const [showTitles, setShowTitles] = useState(() => readPreference(WINDOW_TITLES_KEY));
@@ -88,6 +91,7 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
     setRange(isOverview ? 1 : DEFAULT_HISTORY_DAYS);
     setPickedDay(null);
     setPeriodOffset(0);
+    setTimelineRange(null);
   }
 
   useEffect(() => {
@@ -104,8 +108,9 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   }, [calendarDay, periodOffset, range, selectedDay]);
   const currentQuery = useMemo<ActivityWatchRange>(() => ({
     start: range === "all" ? null : requestedPeriod.start.toISOString(),
-    end: requestedPeriod.end.toISOString()
-  }), [range, requestedPeriod]);
+    end: requestedPeriod.end.toISOString(),
+    includeBrowserTabs: view === "statistics"
+  }), [range, requestedPeriod, view]);
   const previousQuery = useMemo<ActivityWatchRange | null>(() => {
     if (!comparePeriod) return null;
     const start = new Date(requestedPeriod.start);
@@ -115,7 +120,11 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   const currentKey = activitySnapshotKey(currentQuery);
   const previousKey = previousQuery ? activitySnapshotKey(previousQuery) : null;
   const requestKey = JSON.stringify([currentKey, previousKey]);
-  const snapshot = snapshots.get(currentKey) ?? null;
+  const snapshot = useMemo(() => {
+    const key = activitySnapshotKey(currentQuery);
+    return snapshots.get(key) ?? (view === "statistics" && timelineRange?.key === key ? timelineRange.snapshot : null)
+      ?? (view === "statistics" && range === 1 ? coveringActivitySnapshot(snapshots, currentQuery) : null);
+  }, [snapshots, currentQuery, view, range, timelineRange]);
   const previousSnapshot = previousKey ? snapshots.get(previousKey) : undefined;
   const syncLabel = snapshot?.source === "desktop-mirror"
     ? `Desktop and phone synced · ${new Date(snapshot.fetchedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
@@ -214,7 +223,8 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   const rulesLoaded = rulesStatus !== "loading";
   const statistics = useMemo(() => {
     if (!statisticsSnapshot || !rulesLoaded) return null;
-    return buildActivityStatistics(filterEvents(statisticsSnapshot.events, device), categoryRules, statisticsPeriod, statisticsHourly, showTitles);
+    return buildActivityStatistics(filterEvents(statisticsSnapshot.events, device), categoryRules,
+      statisticsPeriod, statisticsHourly, showTitles, statisticsSnapshot);
   }, [categoryRules, device, rulesLoaded, showTitles, statisticsHourly, statisticsPeriod, statisticsSnapshot]);
   const peakDay = visibleDays.reduce<DayActivity | null>((peak, day) => !peak || day.combined > peak.combined ? day : peak, null);
   const periodLabel = labelPeriod(period, range, calendarDay);
@@ -243,6 +253,20 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
     setRange(nextRange);
     setPickedDay(null);
     setPeriodOffset(0);
+    setTimelineRange(null);
+  }
+
+  function openTimelineDay(day: string): void {
+    if (range === 1 || !snapshot) return;
+    setTimelineRange({ range, offset: periodOffset, key: currentKey, snapshot });
+    selectDay(day);
+  }
+
+  function returnToTimelineRange(): void {
+    if (!timelineRange) return;
+    setRange(timelineRange.range);
+    setPickedDay(null);
+    setPeriodOffset(timelineRange.offset);
   }
 
   function movePeriod(offset: -1 | 1): void {
@@ -348,6 +372,7 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
           {view === "history" && <HistoryView days={visibleDays} periodLabel={periodLabel} summary={summary} previous={comparePeriod ? previousSummary : null} />}
           {view === "statistics" && <ActivityStatistics stats={statistics} hourly={statisticsHourly}
             allDevices={device === "all"} rulesFailed={rulesStatus === "error"} showTitles={showTitles}
+            onSelectDay={openTimelineDay} onReturnToRange={range === 1 && timelineRange ? returnToTimelineRange : undefined}
             onToggleTitles={() => updatePreference(WINDOW_TITLES_KEY, !showTitles, setShowTitles)} />}
           {view === "insights" && <InsightsView days={visibleDays} hours={hourProfile} apps={apps} summary={summary} />}
           <footer className="activity-dashboard__footer">
@@ -557,6 +582,13 @@ function ActivitySettingsView({ showTitles, includeLabels, autoRefresh, onShowTi
     {android && <section className="activity-glass-card activity-privacy-card">
       <h2>ActivityWatch connection</h2>
       <button className="activity-button android-reconnect" type="button" onClick={() => android.connectActivityWatch()}>Change API key</button>
+    </section>}
+    {android && <section className="activity-glass-card activity-privacy-card">
+      <h2>PDF reading</h2>
+      <p className="activity-explainer">Record the filename and viewing time in Samsung Notes’ PDF reader. ActivityWatch sync sends these records to your computer.</p>
+      <button className="activity-button android-reconnect" type="button" onClick={() => android.openPdfTrackingSettings()}>
+        Open accessibility settings
+      </button>
     </section>}
     {android && <section className="activity-glass-card activity-privacy-card">
       <h2>Desktop sync</h2>

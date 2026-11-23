@@ -32,6 +32,13 @@ export interface ActivityWatchBucket {
   error: string | null;
 }
 
+export interface ActivityWatchPdf {
+  timestamp: string;
+  duration: number;
+  bucketId: string;
+  filename: string;
+}
+
 export interface ActivityWatchTab {
   timestamp: string;
   duration: number;
@@ -40,6 +47,7 @@ export interface ActivityWatchTab {
   site: string;
   page: string;
   title: string | null;
+  pdfFilename?: string;
 }
 
 export interface ActivityWatchSnapshot {
@@ -49,6 +57,7 @@ export interface ActivityWatchSnapshot {
   buckets: ActivityWatchBucket[];
   events: ActivityWatchRecord[];
   tabs: ActivityWatchTab[];
+  pdfs?: ActivityWatchPdf[];
 }
 
 export interface ActivityWatchCategory {

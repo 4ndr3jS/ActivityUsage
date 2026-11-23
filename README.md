@@ -23,7 +23,7 @@ Activity Usage reads local ActivityWatch records and turns them into a desktop d
 
 Activity Usage reads the local ActivityWatch API at `http://127.0.0.1:5600/api/0`. It does not open or modify ActivityWatch's database files.
 
-For phone activity, install ActivityWatch on Android, grant its Usage Access permission, and sync the phone's data to the desktop instance. Activity Usage reads the synced buckets from the desktop API; it does not connect to Samsung Account, use ADB, or collect phone data directly.
+For phone app activity, install ActivityWatch on Android, grant its Usage Access permission, and sync the phone's data to the desktop instance. Activity Usage reads the synced buckets from the desktop API.
 
 Totals are calculated from the intervals ActivityWatch records. Combined time counts overlapping computer and phone intervals once. These records do not measure attention or productivity.
 
@@ -56,6 +56,12 @@ adb -s DEVICE_SERIAL install -r .\apps\android\out\ActivityUsage.apk
 The script uses `ANDROID_HOME` and `JAVA_HOME` by default. Keep the generated `apps/android/out/local.keystore` for in-place updates.
 
 Open ActivityWatch on the phone and copy its key from **API Authentication**. In Activity Usage, select **Connect** and paste the key for access to local phone activity.
+
+#### PDF reading
+
+In Android Activity Usage, open **Settings → PDF reading → Open accessibility settings**, then enable **Activity Usage PDF reading** under Installed apps. Open PDFs normally from Samsung My Files and use Samsung Notes' PDF reader. The service records the filename and how long that reader stays in the foreground while the screen is unlocked. It sends the intervals to ActivityWatch on the phone, and your existing ActivityWatch sync carries them to the computer.
+
+On the computer, open **Statistics** and select **Reading** to see activity for books, manga sites, and My Files. Select **Show titles** in **Top window titles** to see recorded book and PDF names. Use the date and device filters to compare computer and phone activity. Desktop browser viewing uses the ActivityWatch browser extension alongside the window watcher. For local PDFs, give the extension permission to read file URLs in your browser's extension settings. Supported standalone PDF readers use the filename in the window title.
 
 For combined history on Android, first arrange for ActivityWatch phone records to be imported on the PC. Run `bun tooling/export-activity-mirror.ts <private-sync-folder>` on the PC after imports, for example every few minutes using the same local import job. Share this separate folder with just the phone in Syncthing, using Send Only on the PC, Receive Only on Android, and no file versioning. The folder contains a compressed copy of your recorded activity, including window titles, browser details and category rules. Keep it outside the repository. In Android Activity Usage, open **Settings → Desktop sync** and choose the received folder. The app reads the most recent copy while offline and shows when the PC last exported it.
 

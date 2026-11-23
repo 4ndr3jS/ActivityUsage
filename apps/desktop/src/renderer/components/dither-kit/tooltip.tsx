@@ -22,10 +22,12 @@ export function Tooltip({
   labelKey,
   valueFormatter,
   variant = "default",
+  hideZeroValues = false,
 }: {
   labelKey?: string
   valueFormatter?: (value: number, name: string, index: number) => string
   variant?: TooltipVariant
+  hideZeroValues?: boolean
 }) {
   const chart = useCommonChart()
   const show = chart.ready && chart.hoverIndex != null
@@ -43,7 +45,10 @@ export function Tooltip({
   const index = chart.hoverIndex ?? lastIndex
 
   const heading = chart.heading(index, labelKey)
-  const items = chart.itemsAt(index)
+  const hoveredItems = chart.itemsAt(index)
+  const items = hideZeroValues ? hoveredItems.filter(item => item.value !== 0) : hoveredItems
+
+  if (hideZeroValues && !items.length) return null
 
   return (
     <AnimatePresence>

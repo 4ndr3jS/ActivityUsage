@@ -1,10 +1,27 @@
 import type { ActivityWatchRange, ActivityWatchSnapshot } from "../shared/desktop-api";
+import { sliceActivitySnapshot } from "../shared/activity-mirror";
 
 const FRESH_MS = 60_000;
 const MAX_SNAPSHOTS = 6;
 
 export function activitySnapshotKey({ start, end, includeBrowserTabs }: ActivityWatchRange): string {
   return JSON.stringify([start, end, includeBrowserTabs === true]);
+}
+
+export function coveringActivitySnapshot(
+  snapshots: ReadonlyMap<string, ActivityWatchSnapshot>,
+  range: ActivityWatchRange
+): ActivityWatchSnapshot | null {
+  const from = range.start === null ? -Infinity : Date.parse(range.start);
+  const to = Date.parse(range.end);
+  let latest: ActivityWatchSnapshot | undefined;
+  for (const [key, snapshot] of snapshots) {
+    const [start, end, includesTabs] = JSON.parse(key) as [string | null, string, boolean];
+    if (range.includeBrowserTabs && !includesTabs) continue;
+    if ((start !== null && Date.parse(start) > from) || Date.parse(end) < to) continue;
+    if (!latest || Date.parse(snapshot.fetchedAt) > Date.parse(latest.fetchedAt)) latest = snapshot;
+  }
+  return latest ? sliceActivitySnapshot(latest, range) : null;
 }
 
 export function createActivitySnapshotCache(

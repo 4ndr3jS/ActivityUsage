@@ -12,6 +12,7 @@ import android.graphics.Insets;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.text.InputType;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
@@ -143,6 +144,11 @@ public final class MainActivity extends Activity {
             runOnUiThread(() -> startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION),
                 CHOOSE_SYNC_FOLDER));
+        }
+
+        @JavascriptInterface
+        public void openPdfTrackingSettings() {
+            runOnUiThread(() -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
         }
 
         @JavascriptInterface

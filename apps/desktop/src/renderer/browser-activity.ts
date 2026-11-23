@@ -13,16 +13,12 @@ export interface BrowserActivity {
   unassignedSeconds: number;
 }
 
-interface WindowInterval {
+export interface ActivitySpan {
   start: number;
   end: number;
-  app: string;
-  host: string;
 }
 
-interface TabInterval extends ActivityWatchTab {
-  start: number;
-  end: number;
+interface TabInterval extends ActivityWatchTab, ActivitySpan {
   host: string;
 }
 
@@ -35,14 +31,93 @@ const BROWSERS: Record<string, string> = {
   "samsung internet": "samsung", "com.sec.android.app.sbrowser": "samsung"
 };
 
-function browserOf(raw: string): string | undefined {
+export function browserOf(raw: string): string | undefined {
   const name = raw.trim().toLowerCase().split(/[\\/]/).at(-1)?.replace(/\.(exe|app|desktop)$/, "") ?? "";
   return Object.hasOwn(BROWSERS, name) ? BROWSERS[name] : undefined;
 }
 
-function hostname(bucket: ActivityWatchBucket): string {
+export function browserHostname(bucket: ActivityWatchBucket): string {
   const name = bucket.hostname.trim().toLowerCase();
   return name === "unknown" || name === bucket.id.toLowerCase() ? "" : name;
+}
+
+export function tabBrowser(tab: ActivityWatchTab): string | undefined {
+  return browserOf(tab.browser ?? "") ?? browserOf(/^aw-watcher-web-([^_]+)/.exec(tab.bucketId)?.[1] ?? "");
+}
+
+export function indexActivitySpans<T extends ActivitySpan>(spans: T[]) {
+  spans.sort((a, b) => a.start - b.start);
+  let maxEnd = -Infinity;
+  const maxEnds = spans.map(span => maxEnd = Math.max(maxEnd, span.end));
+  return (start: number, end: number): T[] => {
+    let low = 0;
+    let high = spans.length;
+    while (low < high) {
+      const mid = (low + high) >>> 1;
+      if (spans[mid].start < end) low = mid + 1;
+      else high = mid;
+    }
+    const overlaps: T[] = [];
+    for (let i = low - 1; i >= 0 && maxEnds[i] > start; i--) {
+      if (spans[i].end > start) overlaps.push(spans[i]);
+    }
+    return overlaps;
+  };
+}
+
+/** Candidates are ordered by preference. Leave uncovered portions in the result. */
+export function* splitActivitySpan<T extends ActivitySpan>(start: number, end: number, candidates: T[]) {
+  const cuts = new Set([start, end]);
+  for (const span of candidates) {
+    cuts.add(Math.max(start, span.start));
+    cuts.add(Math.min(end, span.end));
+  }
+  const boundaries = [...cuts].sort((a, b) => a - b);
+  for (let i = 1; i < boundaries.length; i++) {
+    const start = boundaries[i - 1];
+    const end = boundaries[i];
+    yield { start, end, match: candidates.find(span => span.start <= start && span.end >= end) };
+  }
+}
+
+export function createBrowserTabMatcher(events: ActivityWatchRecord[], tabs: ActivityWatchTab[], buckets: ActivityWatchBucket[]) {
+  const sources = new Map(buckets.map(bucket => [bucket.id, bucket]));
+  const hostsByBrowser = new Map<string, Set<string>>();
+  for (const event of events) {
+    const browser = event.app && browserOf(event.app);
+    const source = sources.get(event.bucketId);
+    if (!browser || source?.type !== "currentwindow") continue;
+    const key = `${event.device}:${browser}`;
+    let hosts = hostsByBrowser.get(key);
+    if (!hosts) hostsByBrowser.set(key, hosts = new Set());
+    hosts.add(browserHostname(source));
+  }
+
+  const tabsByBrowser = new Map<string, TabInterval[]>();
+  for (const tab of tabs) {
+    const source = sources.get(tab.bucketId);
+    const browser = tabBrowser(tab);
+    if (!source || !browser) continue;
+    const key = `${source.device}:${browser}`;
+    if (!hostsByBrowser.has(key)) continue;
+    let intervals = tabsByBrowser.get(key);
+    if (!intervals) tabsByBrowser.set(key, intervals = []);
+    const start = Date.parse(tab.timestamp);
+    intervals.push({ ...tab, start, end: start + tab.duration * 1000, host: browserHostname(source) });
+  }
+  const indexes = new Map([...tabsByBrowser].map(([key, intervals]) => [key, indexActivitySpans(intervals)]));
+
+  return (event: ActivityWatchRecord, start: number, end: number): TabInterval[] => {
+    const source = sources.get(event.bucketId);
+    const browser = event.app && browserOf(event.app);
+    if (!browser || source?.type !== "currentwindow") return [];
+    const key = `${event.device}:${browser}`;
+    const host = browserHostname(source);
+    const overlaps = indexes.get(key)?.(start, end) ?? [];
+    // Prefer the matching host, then the latest tab when watchers overlap.
+    return overlaps.filter(tab => tab.host ? tab.host === host : hostsByBrowser.get(key)?.size === 1)
+      .sort((a, b) => Number(Boolean(b.host)) - Number(Boolean(a.host)) || b.start - a.start);
+  };
 }
 
 function add(rows: Map<string, BrowserActivityRow>, label: string, seconds: number, address?: string): void {
@@ -59,72 +134,24 @@ export function buildBrowserActivity(
   buckets: ActivityWatchBucket[]
 ): Map<string, BrowserActivity> {
   const sources = new Map(buckets.map(bucket => [bucket.id, bucket]));
-  const windowsByBrowser = new Map<string, WindowInterval[]>();
-  for (const event of events) {
-    const bucket = sources.get(event.bucketId);
-    const browser = event.app && browserOf(event.app);
-    if (!browser || bucket?.type !== "currentwindow") continue;
-    const key = `${event.device}:${browser}`;
-    let windows = windowsByBrowser.get(key);
-    if (!windows) windowsByBrowser.set(key, windows = []);
-    const start = Date.parse(event.timestamp);
-    windows.push({ start, end: start + event.duration * 1000, app: appLabel(event.app), host: hostname(bucket) });
-  }
-
-  const tabsByBrowser = new Map<string, TabInterval[]>();
-  for (const tab of tabs) {
-    const source = sources.get(tab.bucketId);
-    if (!source) continue;
-    const browser = browserOf(tab.browser ?? "") ?? browserOf(/^aw-watcher-web-([^_]+)/.exec(tab.bucketId)?.[1] ?? "");
-    const key = `${source.device}:${browser}`;
-    if (!windowsByBrowser.has(key)) continue;
-    let intervals = tabsByBrowser.get(key);
-    if (!intervals) tabsByBrowser.set(key, intervals = []);
-    const start = Date.parse(tab.timestamp);
-    intervals.push({ ...tab, start, end: start + tab.duration * 1000, host: hostname(source) });
-  }
-
+  const matchTabs = createBrowserTabMatcher(events, tabs, buckets);
   const apps = new Map<string, {
     sites: Map<string, BrowserActivityRow>; pages: Map<string, BrowserActivityRow>; unassignedSeconds: number;
   }>();
-  for (const [key, windows] of windowsByBrowser) {
-    const intervals = (tabsByBrowser.get(key) ?? []).sort((a, b) => a.start - b.start);
-    const hosts = new Set(windows.map(window => window.host));
-    let maxEnd = -Infinity;
-    const maxEnds = intervals.map(tab => maxEnd = Math.max(maxEnd, tab.end));
-    for (const window of windows) {
-      let app = apps.get(window.app);
-      if (!app) apps.set(window.app, app = { sites: new Map(), pages: new Map(), unassignedSeconds: 0 });
-      // Find overlapping tabs without scanning the whole preceding history.
-      let low = 0;
-      let high = intervals.length;
-      while (low < high) {
-        const mid = (low + high) >>> 1;
-        if (intervals[mid].start < window.end) low = mid + 1;
-        else high = mid;
-      }
-      const candidates: TabInterval[] = [];
-      const cuts = new Set([window.start, window.end]);
-      for (let i = low - 1; i >= 0 && maxEnds[i] > window.start; i--) {
-        const tab = intervals[i];
-        if (tab.end <= window.start || (tab.host ? tab.host !== window.host : hosts.size !== 1)) continue;
-        candidates.push(tab);
-        cuts.add(Math.max(window.start, tab.start));
-        cuts.add(Math.min(window.end, tab.end));
-      }
-      // Prefer the matching host, then the latest tab when watchers overlap.
-      candidates.sort((a, b) => Number(Boolean(b.host)) - Number(Boolean(a.host)) || b.start - a.start);
-      const boundaries = [...cuts].sort((a, b) => a - b);
-      for (let i = 1; i < boundaries.length; i++) {
-        const start = boundaries[i - 1];
-        const end = boundaries[i];
-        const seconds = (end - start) / 1000;
-        const tab = candidates.find(item => item.start <= start && item.end >= end);
-        if (tab) {
-          add(app.sites, tab.site, seconds);
-          add(app.pages, tab.title ?? tab.page, seconds, tab.title ? tab.page : undefined);
-        } else app.unassignedSeconds += seconds;
-      }
+  for (const event of events) {
+    if (!event.app || !browserOf(event.app) || sources.get(event.bucketId)?.type !== "currentwindow") continue;
+    const label = appLabel(event.app);
+    let app = apps.get(label);
+    if (!app) apps.set(label, app = { sites: new Map(), pages: new Map(), unassignedSeconds: 0 });
+    const start = Date.parse(event.timestamp);
+    const end = start + event.duration * 1000;
+    for (const part of splitActivitySpan(start, end, matchTabs(event, start, end))) {
+      const seconds = (part.end - part.start) / 1000;
+      const tab = part.match;
+      if (tab) {
+        add(app.sites, tab.site, seconds);
+        add(app.pages, tab.title ?? tab.page, seconds, tab.title ? tab.page : undefined);
+      } else app.unassignedSeconds += seconds;
     }
   }
   const ranked = (rows: Map<string, BrowserActivityRow>): BrowserActivityRow[] =>

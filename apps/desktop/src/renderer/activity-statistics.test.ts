@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import type { ActivityWatchRecord, ActivityWatchCategory } from "../shared/desktop-api";
-import { buildActivityStatistics, rankActivity } from "./activity-statistics";
+import { buildActivityStatistics, directCategoryColor, directCategoryTime, rankActivity } from "./activity-statistics";
+import { PALETTE } from "./components/dither-kit/palette";
 
 const start = new Date(2026, 0, 1);
 const period = { start, end: new Date(2026, 0, 2) };
@@ -26,13 +27,58 @@ it("uses the highest matching rule and rolls times and rankings up the category 
   const [reading, games, uncategorized] = stats.categories;
   expect(stats.total).toBe(240);
   expect(stats.unsupportedRules).toBe(1);
-  expect(reading).toMatchObject({ path: ["Reading"], seconds: 140, color: [51, 102, 170], children: [{ path: ["Reading", "Books"], seconds: 140 }] });
+  expect(reading).toMatchObject({ path: ["Reading"], seconds: 140, color: PALETTE.blue.fill, children: [{ path: ["Reading", "Books"], seconds: 140 }] });
   expect(games).toMatchObject({ path: ["Games"], seconds: 60 });
   expect(uncategorized).toMatchObject({ path: ["Uncategorized"], seconds: 40 });
   expect(rankActivity(stats, [reading])).toEqual({
     apps: [{ label: "Reader", seconds: 140 }],
     titles: [{ label: "A novel", app: "Reader", seconds: 120 }, { label: "Another novel", app: "Reader", seconds: 20 }]
   });
+});
+
+it("assigns the primary colors by usage rather than by the first event", () => {
+  const names = ["Study", "AI", "Programming", "Utilities"];
+  const categories = names.map(name => ({
+    path: [name], color: "#aaa", rule: { pattern: `^${name}$`, ignoreCase: false, fields: ["app"], priority: 10 }
+  }));
+  const stats = buildActivityStatistics([
+    event(0, 5, "Utilities", null),
+    event(1, 20, "Programming", null),
+    event(2, 40, "Study", null),
+    event(3, 30, "AI", null)
+  ], categories, period, true, false);
+
+  expect(stats.categories.map(category => category.path[0])).toEqual(names);
+  expect(stats.categories.slice(0, 3).map(category => category.color)).toEqual([
+    PALETTE.red.fill, PALETTE.green.fill, PALETTE.blue.fill
+  ]);
+});
+
+it("matches the most-used child to its parent and preserves named color overrides", () => {
+  const categories: ActivityWatchCategory[] = [
+    ...rules,
+    { path: ["Video, Social & Communication"], color: "#fff", rule: { pattern: "^Video$", ignoreCase: false, fields: ["app"], priority: 10 } },
+    { path: ["Anime"], color: "#fff", rule: { pattern: "^Anime$", ignoreCase: false, fields: ["app"], priority: 10 } },
+    { path: ["Anime", "Tensura"], color: null, rule: { pattern: "^Slime$", ignoreCase: false, fields: ["app"], priority: 20 } }
+  ];
+  const stats = buildActivityStatistics([
+    event(0, 30, "Spotify", null),
+    event(0.5, 5, "MangaFire", null),
+    event(1, 25, "Reader", "Novel"),
+    event(2, 20, "Fortnite", null),
+    event(3, 15, "Video", null),
+    event(4, 10, "Anime", null),
+    event(5, 40, "Slime", null),
+  ], categories, period, true, false);
+  const color = (name: string) => stats.categoriesById.get(JSON.stringify([name]))?.color;
+  expect(color("Reading")).toEqual(PALETTE.blue.fill);
+  expect(color("Video, Social & Communication")).toEqual(PALETTE.red.fill);
+  expect(color("Games")).toEqual(PALETTE.orange.fill);
+  expect(color("Anime")).toEqual(PALETTE.green.fill);
+  const reading = stats.categoriesById.get('["Reading"]')!;
+  expect(reading.children[0]).toMatchObject({ path: ["Reading", "Books"], color: reading.color });
+  expect(reading.children[1].color).not.toEqual(reading.color);
+  expect(stats.categoriesById.get('["Anime","Tensura"]')?.color).toEqual([120, 252, 241]);
 });
 
 it("clips overlapping foreground events per device and splits time at hourly boundaries", () => {
@@ -44,6 +90,7 @@ it("clips overlapping foreground events per device and splits time at hourly bou
   const reading = stats.categoriesById.get(JSON.stringify(["Reading"]))!;
   const games = stats.categoriesById.get(JSON.stringify(["Games"]))!;
   expect(stats.total).toBe(540);
+  expect(stats.periods).toHaveLength(24);
   expect(reading.seconds).toBe(180);
   expect(games.seconds).toBe(360);
   expect(stats.periods[0].totals.get(reading.id)).toBe(60);
@@ -61,7 +108,7 @@ it("limits subcategory timeline bins and rankings to that branch", () => {
   const stats = buildActivityStatistics([
     event(0, 60, "Reader", "Novel"),
     event(1, 90, "PDF viewer", "Manual"),
-    event(3, 120, "Spotify", "Music", "phone"),
+    event(3, 120, "Another reader", "Untitled", "phone"),
     event(5, 30, "Game", "Game")
   ], additionalRules, period, true, true);
   const reading = stats.categoriesById.get(JSON.stringify(["Reading"]))!;
@@ -71,8 +118,81 @@ it("limits subcategory timeline bins and rankings to that branch", () => {
   expect(stats.periods[0].totals.get(reading.id)).toBe(150);
   expect(stats.periods[0].totals.get(books.id)).toBe(60);
   expect(rankActivity(stats, [books]).titles).toEqual([{ app: "Reader", label: "Novel", seconds: 60 }]);
-  expect(rankActivity(stats, [uncategorized]).apps).toEqual([{ label: "Spotify", seconds: 120 }]);
-  expect(rankActivity(stats, [books, uncategorized]).apps.map(row => row.label)).toEqual(["Spotify", "Reader"]);
+  expect(rankActivity(stats, [uncategorized]).apps).toEqual([{ label: "Another Reader", seconds: 120 }]);
+  expect(rankActivity(stats, [books, uncategorized]).apps.map(row => row.label)).toEqual(["Another Reader", "Reader"]);
+});
+
+it("keeps directly assigned activity separate from child totals in the breakdown", () => {
+  const categories: ActivityWatchCategory[] = [
+    ...rules,
+    { path: ["Reading"], color: null, rule: { pattern: "^Library$", ignoreCase: false, fields: ["app"], priority: 10 } }
+  ];
+  const stats = buildActivityStatistics([
+    event(58, 90, "Reader", "Novel"),
+    event(59.5, 90, "Library", null)
+  ], categories, period, true, false);
+  const reading = stats.categoriesById.get('["Reading"]')!;
+
+  expect(reading.seconds).toBe(180);
+  expect(reading.children[0].seconds).toBe(90);
+  expect(directCategoryTime(reading)).toBe(90);
+  expect(directCategoryColor(reading)).not.toEqual(reading.children[0].color);
+  expect(stats.periods.slice(0, 2).map(bin => directCategoryTime(reading, bin.totals))).toEqual([30, 60]);
+});
+
+it("groups game variants and keeps specific activities ahead of generic web browsing", () => {
+  const stats = buildActivityStatistics([
+    event(0, 30, "RocketLeague_EAC.exe", "Rocket League"),
+    event(1, 30, "cs2.exe", "Counter-Strike 2"),
+    event(2, 30, "FortniteClient-Win64-Shipping.exe", "Fortnite"),
+    event(3, 30, "OUTSIDE.exe", "WE ARE SO DEAD (64-bit Development PCD3D_SM6)"),
+    event(3.5, 30, "Minecraft.exe", "Minecraft"),
+    event(4, 30, "brave.exe", "Classroom of the Elite – Year 3, Volume 1 - Brave"),
+    event(5, 30, "brave.exe", "Some web page"),
+    event(6, 30, "com.android.chrome", null, "phone"),
+    event(7, 30, "com.google.android.googlequicksearchbox", null, "phone"),
+    event(8, 30, "MangaFire", null, "phone"),
+  ], [], period, true, false);
+  const category = (path: string[]) => stats.categoriesById.get(JSON.stringify(path))!;
+  expect(category(["Games"]).children.map(row => row.path.at(-1))).toEqual(["Rocket League", "Counter-Strike 2", "Fortnite", "WE ARE SO DEAD", "Minecraft"]);
+  expect(category(["Games", "Rocket League"]).color).toEqual(PALETTE.red.fill);
+  expect(category(["Games", "Counter-Strike 2"]).color).toEqual([249, 197, 76]);
+  expect(category(["Games", "Fortnite"]).color).toEqual([52, 197, 155]);
+  expect(category(["Games", "WE ARE SO DEAD"]).color).toEqual([165, 108, 72]);
+  expect(category(["Games", "Minecraft"]).color).toEqual([121, 205, 58]);
+  expect(category(["Reading", "Classroom of the Elite"]).seconds).toBe(30);
+  expect(category(["Reading", "Manga sites"]).seconds).toBe(30);
+  expect(category(["Web Browsing"]).seconds).toBe(90);
+  expect(rankActivity(stats).titles).toEqual([]);
+});
+
+it("attributes Spotify on both devices and matching browser time to one app with a full title breakdown", () => {
+  const bucket = (id: string, type: string) =>
+    ({ id, type, hostname: "pc", device: "computer" as const, lastUpdated: null, eventCount: 0, error: null });
+  const tabs = [{ timestamp: new Date(+start + 120000).toISOString(), duration: 40, bucketId: "aw-watcher-web-brave_pc",
+    title: "A song from the web player", browser: null, site: "open.spotify.com", page: "open.spotify.com/track/test" }];
+  const events = [
+    event(0, 32, "Spotify.exe", "Spotify Premium"),
+    event(1, 20, "com.spotify.music", null, "phone"),
+    event(2, 30, "brave.exe", "A song from the web player - Brave"),
+    event(2.5, 30, "brave.exe", "Other page - Brave")
+  ];
+  const context = { buckets: [bucket("computer", "currentwindow"), bucket("aw-watcher-web-brave_pc", "web.tab.current")], tabs };
+  const stats = buildActivityStatistics(events, [], period, true, true, context);
+  const music = stats.categoriesById.get('["Music"]')!;
+  expect(stats.total).toBe(112);
+  expect(music.seconds).toBe(82);
+  expect(rankActivity(stats, [music])).toEqual({
+    apps: [{ label: "Spotify", seconds: 82 }],
+    titles: [
+      { label: "Spotify Premium · no track title", app: "Spotify", seconds: 32 },
+      { label: "A song from the web player", app: "Spotify", seconds: 30 },
+      { label: "No window title recorded", app: "Spotify", seconds: 20, unrecordedTitle: true }
+    ]
+  });
+  const hidden = buildActivityStatistics(events, [], period, true, false, context);
+  expect(hidden.categoriesById.get(music.id)?.seconds).toBe(82);
+  expect(rankActivity(hidden).titles).toEqual([]);
 });
 
 it("combines technical title variants without removing meaningful title details", () => {

@@ -54,7 +54,7 @@ try {
     } finally { Pop-Location }
 
     Copy-Item -LiteralPath (Join-Path $repo 'branding\activityusage-logo.png') -Destination "$resources\drawable-nodpi\activityusage.png"
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'res\xml') -Destination $resources -Recurse
+    Copy-Item -Path (Join-Path $PSScriptRoot 'res\*') -Destination $resources -Recurse
     Invoke-BuildStep $aapt2 @('compile', '--dir', $resources, '-o', $nativeResources)
     Invoke-BuildStep $aapt2 @('link', '-I', $platformJar, '--manifest', (Join-Path $PSScriptRoot 'AndroidManifest.xml'),
         '-o', $unsigned, $nativeResources)

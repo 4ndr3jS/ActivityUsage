@@ -8,6 +8,10 @@ export interface ActivityMirror {
 }
 
 export function selectMirrorRange(mirror: ActivityMirror, input: ActivityWatchRange): ActivityWatchSnapshot {
+  return { ...sliceActivitySnapshot(mirror.snapshot, input), source: "desktop-mirror" };
+}
+
+export function sliceActivitySnapshot(snapshot: ActivityWatchSnapshot, input: ActivityWatchRange): ActivityWatchSnapshot {
   const range = validateRange(input);
   const start = range.start === null ? -Infinity : Date.parse(range.start);
   const end = Date.parse(range.end);
@@ -22,10 +26,12 @@ export function selectMirrorRange(mirror: ActivityMirror, input: ActivityWatchRa
       return from === timestamp && duration === row.duration ? [row] : [{ ...row, timestamp: new Date(from).toISOString(), duration }];
     });
   }
-  const events = clip(mirror.snapshot.events);
-  const tabs = range.includeBrowserTabs ? clip(mirror.snapshot.tabs) : [];
-  const buckets = mirror.snapshot.buckets
-    .filter(bucket => range.includeBrowserTabs || bucket.type !== "web.tab.current" || /android/i.test(bucket.id))
+  const tabBuckets = new Set(snapshot.buckets.filter(bucket => bucket.type === "web.tab.current").map(bucket => bucket.id));
+  const events = clip(snapshot.events.filter(event => !tabBuckets.has(event.bucketId)));
+  const tabs = range.includeBrowserTabs ? clip(snapshot.tabs) : [];
+  const pdfs = range.includeBrowserTabs ? clip(snapshot.pdfs ?? []) : undefined;
+  const buckets = snapshot.buckets
+    .filter(bucket => range.includeBrowserTabs || (bucket.type !== "document.pdf.current" && !tabBuckets.has(bucket.id)))
     .map(bucket => ({ ...bucket, eventCount: counts.get(bucket.id) ?? 0 }));
-  return { ...mirror.snapshot, buckets, events, tabs, source: "desktop-mirror" };
+  return { ...snapshot, buckets, events, tabs, pdfs };
 }

@@ -8,6 +8,7 @@ export interface ActivityUsageAndroid {
   connectActivityWatch(): void;
   hasSyncFolder(): boolean;
   chooseSyncFolder(): void;
+  openPdfTrackingSettings(): void;
   saveExport(json: string): void;
 }
 
