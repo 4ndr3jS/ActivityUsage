@@ -30,6 +30,7 @@ type DeviceFilter = "all" | ActivityDevice;
 const EMPTY_EVENTS: ActivityWatchRecord[] = [];
 const DEFAULT_HISTORY_DAYS = 30;
 const WINDOW_TITLES_KEY = "activityusage.activity.showTitles";
+const SUBCATEGORY_COLORS_KEY = "activityusage.activity.distinctSubcategoryColors";
 
 interface Period {
   start: Date;
@@ -70,6 +71,7 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   const [device, setDevice] = useState<DeviceFilter>("all");
   const [compare, setCompare] = useState(false);
   const [showTitles, setShowTitles] = useState(() => readPreference(WINDOW_TITLES_KEY));
+  const [distinctSubcategoryColors, setDistinctSubcategoryColors] = useState(() => readPreference(SUBCATEGORY_COLORS_KEY));
   const [includeLabels, setIncludeLabels] = useState(() => readPreference("activityusage.activity.includeLabels"));
   const [autoRefresh, setAutoRefresh] = useState(() => readPreference("activityusage.activity.autoRefresh", true));
   const [calendarDay, setCalendarDay] = useState(todayDay);
@@ -372,6 +374,8 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
           {view === "history" && <HistoryView days={visibleDays} periodLabel={periodLabel} summary={summary} previous={comparePeriod ? previousSummary : null} />}
           {view === "statistics" && <ActivityStatistics stats={statistics} hourly={statisticsHourly}
             allDevices={device === "all"} rulesFailed={rulesStatus === "error"} showTitles={showTitles}
+            distinctSubcategoryColors={distinctSubcategoryColors}
+            onToggleSubcategoryColors={() => updatePreference(SUBCATEGORY_COLORS_KEY, !distinctSubcategoryColors, setDistinctSubcategoryColors)}
             onSelectDay={openTimelineDay} onReturnToRange={range === 1 && timelineRange ? returnToTimelineRange : undefined}
             onToggleTitles={() => updatePreference(WINDOW_TITLES_KEY, !showTitles, setShowTitles)} />}
           {view === "insights" && <InsightsView days={visibleDays} hours={hourProfile} apps={apps} summary={summary} />}

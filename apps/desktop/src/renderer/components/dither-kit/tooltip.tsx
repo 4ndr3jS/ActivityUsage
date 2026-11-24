@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react"
 import { useState } from "react"
-import { useCommonChart } from "./common-context"
+import { useCommonChart, type TooltipItem } from "./common-context"
 import { cn } from "./lib"
 import { rgb } from "./palette"
 
@@ -23,11 +23,13 @@ export function Tooltip({
   valueFormatter,
   variant = "default",
   hideZeroValues = false,
+  itemsAt,
 }: {
   labelKey?: string
   valueFormatter?: (value: number, name: string, index: number) => string
   variant?: TooltipVariant
   hideZeroValues?: boolean
+  itemsAt?: (index: number) => TooltipItem[]
 }) {
   const chart = useCommonChart()
   const show = chart.ready && chart.hoverIndex != null
@@ -45,7 +47,7 @@ export function Tooltip({
   const index = chart.hoverIndex ?? lastIndex
 
   const heading = chart.heading(index, labelKey)
-  const hoveredItems = chart.itemsAt(index)
+  const hoveredItems = (itemsAt ?? chart.itemsAt)(index)
   const items = hideZeroValues ? hoveredItems.filter(item => item.value !== 0) : hoveredItems
 
   if (hideZeroValues && !items.length) return null

@@ -7,7 +7,7 @@ import { Bar } from "./dither-kit/bar";
 import { BarChart } from "./dither-kit/bar-chart";
 import { useChartPart, type ChartConfig } from "./dither-kit/chart-context";
 import { Grid } from "./dither-kit/grid";
-import { rgb } from "./dither-kit/palette";
+import { rgb, seedOfColor } from "./dither-kit/palette";
 import { Pie } from "./dither-kit/pie";
 import { PieChart } from "./dither-kit/pie-chart";
 import { Tooltip } from "./dither-kit/tooltip";
@@ -23,7 +23,9 @@ interface StatisticsControls {
   allDevices: boolean;
   rulesFailed: boolean;
   showTitles: boolean;
+  distinctSubcategoryColors: boolean;
   onToggleTitles(): void;
+  onToggleSubcategoryColors(): void;
   onSelectDay(day: string): void;
   onReturnToRange?(): void;
 }
@@ -33,19 +35,23 @@ export function ActivityStatistics({ stats, ...props }: StatisticsControls & { s
   return <StatisticsContent stats={stats} {...props} />;
 }
 
-function StatisticsContent({ stats, hourly, allDevices, rulesFailed, showTitles, onToggleTitles, onSelectDay, onReturnToRange }:
+function StatisticsContent({ stats, hourly, allDevices, rulesFailed, showTitles, distinctSubcategoryColors,
+  onToggleTitles, onToggleSubcategoryColors, onSelectDay, onReturnToRange }:
   StatisticsControls & { stats: Statistics }): React.JSX.Element {
   const [categoryChoice, setCategoryChoice] = useState<CategoryTotal | null>(null);
   const [appName, setAppName] = useState<string | null>(null);
-  const options = useMemo(() => flattenCategories(stats.categories), [stats.categories]);
+  const categories = useMemo(() => distinctSubcategoryColors ? stats.categories :
+    stats.categories.map(category => inheritCategoryColor(category, category.color)), [stats.categories, distinctSubcategoryColors]);
+  const options = useMemo(() => flattenCategories(categories), [categories]);
   const selectedCategory = useMemo(() => {
     if (!categoryChoice) return undefined;
-    return stats.categoriesById.get(categoryChoice.id)
+    return options.find(category => category.id === categoryChoice.id)
       ?? (onReturnToRange ? { ...categoryChoice, seconds: 0, children: [] } : undefined);
-  }, [categoryChoice, stats.categoriesById, onReturnToRange]);
+  }, [categoryChoice, options, onReturnToRange]);
   const selected = useMemo(() => selectedCategory ? asChartCategory(selectedCategory) : undefined, [selectedCategory]);
   const parent = selectedCategory && stats.categoriesById.get(JSON.stringify(selectedCategory.path.slice(0, -1)));
-  const groups = useMemo(() => chartGroups(stats.categories, selectedCategory), [stats.categories, selectedCategory]);
+  const groups = useMemo(() => chartGroups(categories, selectedCategory, distinctSubcategoryColors),
+    [categories, selectedCategory, distinctSubcategoryColors]);
   const ranks = useMemo(() => rankActivity(stats, selectedCategory ? [selectedCategory] : []), [stats, selectedCategory]);
   const filteredApp = ranks.apps.some(row => row.label === appName) ? appName : null;
   const titles = useMemo(() => ranks.titles.filter(row => filteredApp ? row.app === filteredApp : !row.unrecordedTitle), [filteredApp, ranks.titles]);
@@ -60,8 +66,10 @@ function StatisticsContent({ stats, hourly, allDevices, rulesFailed, showTitles,
   return <div className="activity-statistics">
     <div className="activity-statistics__charts">
       <CategoryTimeline stats={stats} groups={groups} selected={selectedCategory} hourly={hourly} allDevices={allDevices}
+        distinctSubcategoryColors={distinctSubcategoryColors}
         onSelectDay={onSelectDay} onReturnToRange={onReturnToRange} />
       <CategoryMix total={selected?.seconds ?? stats.total} groups={groups} selected={selected} parentLabel={parent?.path.at(-1)}
+        distinctSubcategoryColors={distinctSubcategoryColors} onToggleSubcategoryColors={onToggleSubcategoryColors}
         onSelect={chooseCategory} onBack={() => chooseCategory(parent?.id ?? "")} />
     </div>
     {message && <p className="activity-statistics__status" role="status">{message}</p>}
@@ -72,7 +80,7 @@ function StatisticsContent({ stats, hourly, allDevices, rulesFailed, showTitles,
     <div className="activity-statistics__details">
       <section className="activity-glass-card activity-stat-card">
         <header className="activity-stat-card__heading"><div><h3>Category tree</h3><p>Category totals include subcategories.</p></div></header>
-        {stats.categories.length ? <CategoryTree categories={stats.categories} selected={selectedCategory}
+        {categories.length ? <CategoryTree categories={categories} selected={selectedCategory}
           onSelect={id => chooseCategory(selected?.id === id ? parent?.id ?? "" : id)} />
           : <p className="activity-stat-card__empty">No categories in this period.</p>}
       </section>
@@ -97,7 +105,7 @@ function asChartCategory(category: CategoryTotal): ChartCategory {
   return { id: category.id, label: category.path.join(" › "), color: category.color, seconds: category.seconds };
 }
 
-function chartGroups(roots: CategoryTotal[], selected?: CategoryTotal): ChartCategory[] {
+function chartGroups(roots: CategoryTotal[], selected: CategoryTotal | undefined, distinctSubcategoryColors: boolean): ChartCategory[] {
   if (!selected) return roots.map(asChartCategory);
   if (!selected.children.length) return [asChartCategory(selected)];
   const groups = selected.children.map(child => ({ ...asChartCategory(child), label: child.path.at(-1)! }));
@@ -105,7 +113,7 @@ function chartGroups(roots: CategoryTotal[], selected?: CategoryTotal): ChartCat
   if (!direct) return groups;
   return [...groups, {
     ...asChartCategory(selected), label: `Other ${selected.path.at(-1)} activity`,
-    color: directCategoryColor(selected), seconds: direct, direct: true
+    color: distinctSubcategoryColors ? directCategoryColor(selected) : selected.color, seconds: direct, direct: true
   }];
 }
 
@@ -113,24 +121,30 @@ function chartConfig(groups: ChartCategory[]): ChartConfig {
   return Object.fromEntries(groups.map(group => [group.id, { label: group.label, color: group.color }]));
 }
 
-function CategoryTimeline({ stats, groups, selected, hourly, allDevices, onSelectDay, onReturnToRange }: {
+function CategoryTimeline({ stats, groups, selected, hourly, allDevices, distinctSubcategoryColors, onSelectDay, onReturnToRange }: {
   stats: Statistics; groups: ChartCategory[]; selected?: CategoryTotal; hourly: boolean; allDevices: boolean;
+  distinctSubcategoryColors: boolean;
   onSelectDay(day: string): void; onReturnToRange?(): void;
 }): React.JSX.Element {
-  const config = useMemo(() => chartConfig(groups), [groups]);
+  const merged = selected && groups.length > 1 && !distinctSubcategoryColors ? selected : undefined;
+  const bars = useMemo(() => merged ? [{ ...asChartCategory(merged), id: "total" }] : groups, [groups, merged]);
+  const config = useMemo(() => chartConfig(bars), [bars]);
   const rows = useMemo(() => stats.periods.map((period): { key: number; label: string; [key: string]: number | string } => ({
     key: period.start, label: period.label,
+    ...(merged ? { total: period.totals.get(merged.id) ?? 0 } : {}),
     ...Object.fromEntries(groups.map(group => [
       group.id, group.direct && selected ? directCategoryTime(selected, period.totals) : period.totals.get(group.id) ?? 0
     ]))
-  })), [groups, selected, stats.periods]);
+  })), [groups, merged, selected, stats.periods]);
   const view = hourly ? "By hour" : stats.periods.some(period => period.label.includes(" – ")) ? "By date range" : "By day";
+  const subtitle = (selected ? `${selected.path.join(" › ")} · ${view.toLowerCase()}` : view)
+    + (allDevices ? " · Computer and phone time are added" : "");
   const total = selected?.seconds ?? stats.total;
   const periodKey = `${stats.periods[0]?.start}:${stats.periods.at(-1)?.end}:${hourly}`;
 
   return <section className="activity-glass-card activity-stat-card activity-stat-timeline-card">
     <header className="activity-stat-card__heading">
-      <div><h3>Category timeline</h3><p>{selected ? `${selected.path.join(" › ")} · ${view.toLowerCase()}` : view}{allDevices && " · Computer and phone time are added"}</p></div>
+      <div><h3>Category timeline</h3><p title={subtitle}>{subtitle}</p></div>
       <div className="activity-stat-timeline__summary">
         <strong>{formatTime(total)}</strong>
         {onReturnToRange && <button className="activity-stat-card__action" type="button" onClick={onReturnToRange}>Back to range</button>}
@@ -140,9 +154,13 @@ function CategoryTimeline({ stats, groups, selected, hourly, allDevices, onSelec
       {rows.length ? <BarChart data={rows} config={config} stackType="stacked" animate={false}
         margins={{ top: 18, right: 25, bottom: 30, left: 51 }}>
         <Grid /><XAxis dataKey="label" maxTicks={7} minTickSpacing={85} /><YAxis tickFormatter={formatTime} tickCount={4} />
-        {groups.map(group => <Bar key={group.id} dataKey={group.id} variant="solid" />)}
+        {bars.map(bar => <Bar key={bar.id} dataKey={bar.id} variant="solid" />)}
         {!hourly && <DailyBarActions periods={stats.periods} onSelectDay={onSelectDay} />}
-        <Tooltip labelKey="label" valueFormatter={formatTime} variant="frosted-glass" hideZeroValues />
+        <Tooltip labelKey="label" valueFormatter={formatTime} variant="frosted-glass" hideZeroValues
+          itemsAt={merged ? index => groups.map(group => ({
+            name: group.id, label: group.label, value: Number(rows[index]?.[group.id] ?? 0),
+            seed: seedOfColor(group.color), dimmed: false
+          })) : undefined} />
       </BarChart> : <div className="activity-chart-empty"><span>No recorded activity</span></div>}
     </div>
     {total > 0 && <details className="activity-chart-values">
@@ -178,14 +196,24 @@ function DailyBarActions({ periods, onSelectDay }: {
 
 DailyBarActions.chartLayer = "dom" as const;
 
-function CategoryMix({ total, groups, selected, parentLabel, onSelect, onBack }: {
+function CategoryMix({ total, groups, selected, parentLabel, distinctSubcategoryColors, onToggleSubcategoryColors, onSelect, onBack }: {
   total: number; groups: ChartCategory[]; selected?: ChartCategory; parentLabel?: string;
+  distinctSubcategoryColors: boolean;
+  onToggleSubcategoryColors(): void;
   onSelect(id: string): void; onBack(): void;
 }): React.JSX.Element {
   const config = useMemo(() => chartConfig(groups), [groups]);
   const isLeaf = selected?.id === groups[0]?.id && groups.length === 1;
   return <section className="activity-glass-card activity-stat-card activity-stat-mix">
-    <header className="activity-stat-card__heading"><div><h3>Category share</h3><p>{selected?.label ?? "Select a category to filter statistics."}</p></div></header>
+    <header className="activity-stat-card__heading activity-stat-mix__heading">
+      <h3>Category share</h3>
+      <p title={selected?.label}>{selected?.label ?? "Select a category to filter statistics."}</p>
+      {selected && groups.length > 1 && <label className="activity-switch activity-stat-mix__color-toggle">
+        <input type="checkbox" role="switch" aria-label="Different colors for subcategories"
+          checked={distinctSubcategoryColors} onChange={onToggleSubcategoryColors} />
+        <span>Different colors</span>
+      </label>}
+    </header>
     {total > 0 ? <div className="activity-stat-mix__content">
       <div className="activity-stat-mix__ring">
         <div className="activity-stat-mix__plot" aria-hidden="true">
@@ -199,7 +227,7 @@ function CategoryMix({ total, groups, selected, parentLabel, onSelect, onBack }:
           </button>
           : <div className="activity-stat-mix__center"><strong>{formatTime(total)}</strong><small>recorded</small></div>}
       </div>
-      <ul className="activity-stat-mix__legend">{groups.map(group => {
+      <ul key={selected?.id ?? "all"} className="activity-stat-mix__legend">{groups.map(group => {
         const share = group.seconds / total;
         const content = <>
           <span className="activity-stat-swatch" style={{ backgroundColor: rgb(group.color) }} />
@@ -278,6 +306,10 @@ function CategoryTreeItem({ category, selected, onSelect }: CategoryTreeProps & 
 
 function flattenCategories(categories: CategoryTotal[]): CategoryTotal[] {
   return categories.flatMap(category => [category, ...flattenCategories(category.children)]);
+}
+
+function inheritCategoryColor(category: CategoryTotal, color: CategoryTotal["color"]): CategoryTotal {
+  return { ...category, color, children: category.children.map(child => inheritCategoryColor(child, color)) };
 }
 
 function RankCard({ title, subtitle, rows, empty, action, hideRows = false, selectedRow, onSelectRow }: {

@@ -183,6 +183,7 @@
   .activity-statistics { gap: 12px; }
   .activity-statistics__detail-heading { align-items: stretch; flex-direction: column; gap: 12px; margin: 12px 0 0; }
   .activity-statistics__filter { display: grid; gap: 8px; }
+  .activity-stat-mix__heading { --color-switch-height: 48px; }
   .activity-stat-mix__center strong { font-size: 18px; }
   .activity-stat-mix__center small { font-size: 10px; }
   .activity-donut-center strong { max-width: 65%; text-align: center; overflow-wrap: anywhere; line-height: 1.15; }
