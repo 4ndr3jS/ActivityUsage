@@ -44,6 +44,7 @@ interface TimelinePeriod {
   end: number;
   label: string;
   totals: Map<string, number>;
+  applicationTotals: Map<string, Map<string, number>>;
 }
 
 interface Rank {
@@ -122,9 +123,16 @@ export function buildActivityStatistics(
           const bin = periods[index];
           const overlap = Math.min(end, bin.end) - Math.max(start, bin.start);
           if (overlap <= 0) continue;
+          const secondsInBin = overlap / 1000;
           for (const category of ancestors) {
-            bin.totals.set(category.id, (bin.totals.get(category.id) ?? 0) + overlap / 1000);
+            bin.totals.set(category.id, (bin.totals.get(category.id) ?? 0) + secondsInBin);
           }
+          let byApp = bin.applicationTotals.get(leaf.id);
+          if (!byApp) {
+            byApp = new Map();
+            bin.applicationTotals.set(leaf.id, byApp);
+          }
+          byApp.set(app, (byApp.get(app) ?? 0) + secondsInBin);
         }
       }
 
@@ -176,16 +184,22 @@ function windowTitleLabel(title: string, app: string): string {
   return details.trim().split(/[\s,]+/).every(flag => buildFlag.test(flag)) ? build[1].trim() : label;
 }
 
-export function rankActivity(statistics: ActivityStatistics, selected: readonly CategoryTotal[] = []): {
+export function rankActivity(statistics: ActivityStatistics, selected: readonly CategoryTotal[] = [], selectedApp?: string | null): {
   apps: Rank[];
   titles: Rank[];
 } {
   const apps = new Map<string, Rank>();
   const titles = new Map<string, Rank>();
-  for (const group of statistics.ranks) {
-    if (selected.length && !selected.some(category => category.path.every((part, index) => part === group.path[index]))) continue;
+  const groups = selected.length ? statistics.ranks.filter(group =>
+    selected.some(category => category.path.every((part, index) => part === group.path[index]))) : statistics.ranks;
+  for (const group of groups) {
     for (const [key, value] of group.apps) addRank(apps, key, value);
-    for (const [key, value] of group.titles) addRank(titles, key, value);
+  }
+  const app = selectedApp && apps.has(selectedApp) ? selectedApp : null;
+  for (const group of groups) {
+    for (const [key, value] of group.titles) {
+      if (!app || value.app === app) addRank(titles, key, value);
+    }
   }
   return { apps: [...apps.values()].sort(byTime), titles: [...titles.values()].sort(byTime) };
 }
@@ -200,6 +214,18 @@ export function directCategoryTime(category: CategoryTotal, totals?: ReadonlyMap
 export function directCategoryColor(category: CategoryTotal): Rgb {
   const colors = category.children.map(child => child.color);
   return colors.includes(category.color) ? distinctColor(colors, colorFamily(category.color)) : category.color;
+}
+
+export function applicationRankColors(categoryColor: Rgb, count: number): Rgb[] {
+  const categoryKey = categoryColor.join(",");
+  const colors = [categoryColor, ...PREFERRED_COLORS.filter(color => color.join(",") !== categoryKey)].slice(0, count);
+  const taken = new Set(colors.map(color => color.join(",")));
+  while (colors.length < count) {
+    const next = distinctColor(colors, ADDITIONAL_COLORS, taken);
+    colors.push(next);
+    taken.add(next.join(","));
+  }
+  return colors;
 }
 
 function assignCategoryColors(roots: CategoryTotal[], categories: ReadonlyMap<string, CategoryTotal>): void {
@@ -304,7 +330,8 @@ function buildTimelinePeriods(period: { start: Date; end: Date }, hourly: boolea
       start: Math.max(start, +period.start),
       end: Math.min(boundaries[hour + 1], +period.end),
       label: hourLabel.format(Date.UTC(2000, 0, 1, hour)),
-      totals: new Map<string, number>()
+      totals: new Map<string, number>(),
+      applicationTotals: new Map<string, Map<string, number>>()
     }));
   }
   const boundaries = [+period.start];
@@ -327,7 +354,8 @@ function buildTimelinePeriods(period: { start: Date; end: Date }, hourly: boolea
     periods.push({
       start, end,
       label: last === index ? label : `${label} – ${dayLabel.format(boundaries[last])}`,
-      totals: new Map<string, number>()
+      totals: new Map<string, number>(),
+      applicationTotals: new Map<string, Map<string, number>>()
     });
   }
   return periods;

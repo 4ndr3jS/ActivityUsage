@@ -103,12 +103,12 @@
   flex: none;
 }
 
-.activity-stat-timeline__day {
+.activity-stat-timeline__bar {
   position: absolute;
   cursor: pointer;
 }
 
-.activity-stat-timeline__day:focus-visible {
+.activity-stat-timeline__bar:focus-visible {
   outline: 2px solid var(--foreground);
   outline-offset: 2px;
 }
@@ -182,28 +182,54 @@ button.activity-stat-mix__center:hover { background: var(--default); }
   padding: 0;
 }
 
+.activity-stat-mix__sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  block-size: 260px;
+}
+
+.activity-stat-mix__scroll {
+  min-block-size: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding-inline: 2px 4px;
+}
+
 .activity-stat-mix__legend {
   display: grid;
   align-content: start;
   gap: 3px;
-  width: 100%;
-  min-width: 0;
-  block-size: 260px;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
-  padding-inline: 2px 4px;
   font-size: 12px;
 }
 
-:is(.activity-stat-mix__legend, .activity-statistics__menu)::-webkit-scrollbar { width: 5px; }
-:is(.activity-stat-mix__legend, .activity-statistics__menu)::-webkit-scrollbar-track { background: transparent; }
-:is(.activity-stat-mix__legend, .activity-statistics__menu)::-webkit-scrollbar-button { display: none; }
-:is(.activity-stat-mix__legend, .activity-statistics__menu)::-webkit-scrollbar-thumb {
+.activity-stat-mix__apps {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-block-size: 0;
+}
+
+.activity-stat-mix__apps h4 {
+  margin: 1px 10px 4px;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.activity-stat-mix__apps .activity-stat-rank { margin-top: 0; gap: 3px; }
+.activity-stat-mix__apps .activity-stat-rank__label { display: flex; align-items: center; gap: 8px; }
+.activity-stat-mix__apps .activity-stat-card__more { margin-inline: 8px; }
+
+:is(.activity-stat-mix__scroll, .activity-statistics__menu)::-webkit-scrollbar { width: 5px; }
+:is(.activity-stat-mix__scroll, .activity-statistics__menu)::-webkit-scrollbar-track { background: transparent; }
+:is(.activity-stat-mix__scroll, .activity-statistics__menu)::-webkit-scrollbar-button { display: none; }
+:is(.activity-stat-mix__scroll, .activity-statistics__menu)::-webkit-scrollbar-thumb {
   --activity-scroll-thumb: color-mix(in oklab, var(--foreground) 30%, transparent);
   background: var(--activity-scroll-thumb);
   border-radius: 999px;
 }
-:is(.activity-stat-mix__legend, .activity-statistics__menu)::-webkit-scrollbar-thumb:hover {
+:is(.activity-stat-mix__scroll, .activity-statistics__menu)::-webkit-scrollbar-thumb:hover {
   --activity-scroll-thumb: color-mix(in oklab, var(--foreground) 50%, transparent);
 }
 .activity-statistics__menu::-webkit-scrollbar-thumb {

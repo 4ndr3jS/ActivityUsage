@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Popover } from "@heroui/react";
+import { sliceActivitySnapshot } from "../../shared/activity-mirror";
 import type { ActivityDevice, ActivityWatchBucket, ActivityWatchCategory, ActivityWatchRange, ActivityWatchRecord, ActivityWatchSnapshot } from "../../shared/desktop-api";
 import { ChevronDownIcon, RefreshIcon, ShareIcon } from "../icons";
 import { Area } from "./dither-kit/area";
@@ -42,6 +43,12 @@ interface Interval {
   end: number;
 }
 
+interface TimelinePosition {
+  spans: Interval[];
+  index: number;
+  anchorDay: string;
+}
+
 interface DayActivity {
   key: string;
   label: string;
@@ -65,9 +72,7 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   const [wasOverview, setWasOverview] = useState(isOverview);
   const requestVersion = useRef(0);
   const [periodOffset, setPeriodOffset] = useState(0);
-  const [timelineRange, setTimelineRange] = useState<{
-    range: AnalyticsRange; offset: number; key: string; snapshot: ActivityWatchSnapshot;
-  } | null>(null);
+  const [timelinePath, setTimelinePath] = useState<TimelinePosition[]>([]);
   const [device, setDevice] = useState<DeviceFilter>("all");
   const [compare, setCompare] = useState(false);
   const [showTitles, setShowTitles] = useState(() => readPreference(WINDOW_TITLES_KEY));
@@ -93,7 +98,7 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
     setRange(isOverview ? 1 : DEFAULT_HISTORY_DAYS);
     setPickedDay(null);
     setPeriodOffset(0);
-    setTimelineRange(null);
+    setTimelinePath([]);
   }
 
   useEffect(() => {
@@ -102,12 +107,19 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  const selectedDay = pickedDay ?? calendarDay;
+  const timelinePosition = view === "statistics" ? timelinePath.at(-1) : undefined;
+  const timelineSpan = timelinePosition?.spans[timelinePosition.index];
+  const timelinePeriod = useMemo<Period | null>(() => timelineSpan
+    ? { start: new Date(timelineSpan.start), end: new Date(timelineSpan.end) }
+    : null, [timelineSpan]);
+  const selectedDay = timelinePeriod ? todayDay(timelinePeriod.start) : pickedDay ?? calendarDay;
+  const rangeAnchor = timelinePosition?.anchorDay ?? calendarDay;
+  const periodAnchor = range === 1 ? selectedDay : rangeAnchor;
+  const singleDay = timelineSpan ? selectedDay === todayDay(new Date(timelineSpan.end - 1)) : range === 1;
   const comparePeriod = compare && range !== "all" && view !== "statistics";
-  const requestedPeriod = useMemo(() => {
-    const anchor = range === 1 ? selectedDay : calendarDay;
-    return createActivityPeriod(range === "all" ? 1 : range, periodOffset, new Date(`${anchor}T12:00:00`));
-  }, [calendarDay, periodOffset, range, selectedDay]);
+  const requestedPeriod = useMemo(() => createActivityPeriod(
+    range === "all" ? 1 : range, periodOffset, new Date(`${periodAnchor}T12:00:00`)
+  ), [periodAnchor, periodOffset, range]);
   const currentQuery = useMemo<ActivityWatchRange>(() => ({
     start: range === "all" ? null : requestedPeriod.start.toISOString(),
     end: requestedPeriod.end.toISOString(),
@@ -122,11 +134,18 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   const currentKey = activitySnapshotKey(currentQuery);
   const previousKey = previousQuery ? activitySnapshotKey(previousQuery) : null;
   const requestKey = JSON.stringify([currentKey, previousKey]);
-  const snapshot = useMemo(() => {
+  const baseSnapshot = useMemo(() => {
     const key = activitySnapshotKey(currentQuery);
-    return snapshots.get(key) ?? (view === "statistics" && timelineRange?.key === key ? timelineRange.snapshot : null)
-      ?? (view === "statistics" && range === 1 ? coveringActivitySnapshot(snapshots, currentQuery) : null);
-  }, [snapshots, currentQuery, view, range, timelineRange]);
+    return snapshots.get(key) ?? (view === "statistics" && range === 1 ? coveringActivitySnapshot(snapshots, currentQuery) : null);
+  }, [snapshots, currentQuery, view, range]);
+  const snapshot = useMemo(() => {
+    if (!baseSnapshot || !timelinePeriod) return baseSnapshot;
+    return sliceActivitySnapshot(baseSnapshot, {
+      start: timelinePeriod.start.toISOString(),
+      end: timelinePeriod.end.toISOString(),
+      includeBrowserTabs: true
+    });
+  }, [baseSnapshot, timelinePeriod]);
   const previousSnapshot = previousKey ? snapshots.get(previousKey) : undefined;
   const syncLabel = snapshot?.source === "desktop-mirror"
     ? `Desktop and phone synced · ${new Date(snapshot.fetchedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
@@ -195,11 +214,12 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   const events = snapshot?.events ?? EMPTY_EVENTS;
   const firstEvent = events[0]?.timestamp;
   const period = useMemo(() => {
+    if (timelinePeriod) return timelinePeriod;
     if (range !== "all" || !firstEvent) return requestedPeriod;
     const start = new Date(firstEvent);
     start.setHours(0, 0, 0, 0);
     return { start, end: requestedPeriod.end };
-  }, [firstEvent, range, requestedPeriod]);
+  }, [firstEvent, range, requestedPeriod, timelinePeriod]);
   const visibleEvents = useMemo(() => filterEvents(events, device), [device, events]);
   const summary = useMemo(() => summarize(events, device), [device, events]);
   const previousSummary = useMemo(
@@ -221,7 +241,7 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
   const apps = useMemo(() => needsApps ? buildApps(visibleEvents, includeAppTitles) : [], [includeAppTitles, visibleEvents, needsApps]);
   const useHistoryForStatistics = isOverview || !snapshot || currentKey === historyKey;
   const statisticsPeriod = useHistoryForStatistics ? historyPeriod : period;
-  const statisticsHourly = !useHistoryForStatistics && range === 1;
+  const statisticsHourly = !useHistoryForStatistics && singleDay;
   const rulesLoaded = rulesStatus !== "loading";
   const statistics = useMemo(() => {
     if (!statisticsSnapshot || !rulesLoaded) return null;
@@ -229,8 +249,8 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
       statisticsPeriod, statisticsHourly, showTitles, statisticsSnapshot);
   }, [categoryRules, device, rulesLoaded, showTitles, statisticsHourly, statisticsPeriod, statisticsSnapshot]);
   const peakDay = visibleDays.reduce<DayActivity | null>((peak, day) => !peak || day.combined > peak.combined ? day : peak, null);
-  const periodLabel = labelPeriod(period, range, calendarDay);
-  const navigatorLabel = range === 1 || periodOffset < 0 ? periodLabel : formatPeriodLabel(range);
+  const periodLabel = labelPeriod(period, singleDay, calendarDay);
+  const navigatorLabel = timelinePeriod || range === 1 || periodOffset < 0 ? periodLabel : formatPeriodLabel(range);
   const pageTitle: Record<ActivityView, string> = {
     overview: "Your device activity",
     history: "Activity history",
@@ -249,30 +269,31 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
     setRange(1);
     setPickedDay(day === calendarDay ? null : day);
     setPeriodOffset(0);
+    setTimelinePath([]);
   }
 
   function selectRange(nextRange: AnalyticsRange): void {
     setRange(nextRange);
     setPickedDay(null);
     setPeriodOffset(0);
-    setTimelineRange(null);
+    setTimelinePath([]);
   }
 
-  function openTimelineDay(day: string): void {
-    if (range === 1 || !snapshot) return;
-    setTimelineRange({ range, offset: periodOffset, key: currentKey, snapshot });
-    selectDay(day);
+  function openTimelinePeriod(index: number): void {
+    if (!snapshot || !statistics?.periods[index]) return;
+    const spans = statistics.periods.map(({ start, end }) => ({ start, end }));
+    setTimelinePath(path => [...path, { spans, index, anchorDay: rangeAnchor }]);
   }
 
   function returnToTimelineRange(): void {
-    if (!timelineRange) return;
-    setRange(timelineRange.range);
-    setPickedDay(null);
-    setPeriodOffset(timelineRange.offset);
+    setTimelinePath(path => path.slice(0, -1));
   }
 
   function movePeriod(offset: -1 | 1): void {
-    if (range === 1) selectDay(shiftDay(selectedDay, offset));
+    if (timelinePosition) {
+      const index = timelinePosition.index + offset;
+      if (timelinePosition.spans[index]) setTimelinePath(path => [...path.slice(0, -1), { ...timelinePosition, index }]);
+    } else if (range === 1) selectDay(shiftDay(selectedDay, offset));
     else setPeriodOffset(value => Math.min(0, value + offset));
   }
 
@@ -309,16 +330,17 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
       {(!android || view !== "settings") && <div className="activity-toolbar" aria-label="Activity controls">
         <div className="activity-period-controls">
           <TimeNavigator
-            canMoveBack={range !== "all"}
-            canMoveForward={range === 1 ? selectedDay < calendarDay : periodOffset < 0}
+            canMoveBack={timelinePosition ? timelinePosition.index > 0 : range !== "all"}
+            canMoveForward={timelinePosition ? timelinePosition.index < timelinePosition.spans.length - 1
+              : range === 1 ? selectedDay < calendarDay : periodOffset < 0}
             label={navigatorLabel}
-            mode={range === 1 ? "day" : "range"}
+            mode={singleDay ? "day" : "range"}
             onMoveBack={() => movePeriod(-1)}
             onMoveForward={() => movePeriod(1)}
             onSelectDay={selectDay}
             onSelectRange={selectRange}
             selectedDay={selectedDay}
-            selectedRange={range === 1 ? undefined : range}
+            selectedRange={timelinePeriod || range === 1 ? undefined : range}
             today={calendarDay}
           />
         </div>
@@ -376,7 +398,7 @@ export function ActivityDashboard({ view }: { view: ActivityView }): React.JSX.E
             allDevices={device === "all"} rulesFailed={rulesStatus === "error"} showTitles={showTitles}
             distinctSubcategoryColors={distinctSubcategoryColors}
             onToggleSubcategoryColors={() => updatePreference(SUBCATEGORY_COLORS_KEY, !distinctSubcategoryColors, setDistinctSubcategoryColors)}
-            onSelectDay={openTimelineDay} onReturnToRange={range === 1 && timelineRange ? returnToTimelineRange : undefined}
+            onSelectPeriod={openTimelinePeriod} onReturnToRange={timelinePosition ? returnToTimelineRange : undefined}
             onToggleTitles={() => updatePreference(WINDOW_TITLES_KEY, !showTitles, setShowTitles)} />}
           {view === "insights" && <InsightsView days={visibleDays} hours={hourProfile} apps={apps} summary={summary} />}
           <footer className="activity-dashboard__footer">
@@ -654,12 +676,11 @@ function PreferenceToggle({ checked, label, note, onChange }: { checked: boolean
   return <label className="activity-preference"><span><strong>{label}</strong><small>{note}</small></span><input type="checkbox" checked={checked} onChange={event => onChange(event.target.checked)} /></label>;
 }
 
-function labelPeriod(period: Period, range: ActivityRange, today: string): string {
+function labelPeriod(period: Period, singleDay: boolean, today: string): string {
   const day = todayDay(period.start);
-  if (range === 1 && day === today) return "Today";
-  if (range === 1 && day === shiftDay(today, -1)) return "Yesterday";
-  const last = new Date(period.end);
-  last.setDate(last.getDate() - 1);
+  if (singleDay && day === today) return "Today";
+  if (singleDay && day === shiftDay(today, -1)) return "Yesterday";
+  const last = new Date(period.end.getTime() - 1);
   const options: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
   if (last.getFullYear() !== Number(today.slice(0, 4)) || period.start.getFullYear() !== last.getFullYear()) {
     options.year = "numeric";

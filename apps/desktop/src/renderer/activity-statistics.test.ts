@@ -36,6 +36,21 @@ it("uses the highest matching rule and rolls times and rankings up the category 
   });
 });
 
+it("filters window title rankings by app while retaining app totals", () => {
+  const stats = buildActivityStatistics([
+    event(0, 120, "Reader", "A novel"),
+    event(3, 60, "Another reader", "Another novel"),
+    event(5, 30, "Game", "Game")
+  ], rules, period, true, true);
+  const reading = stats.categoriesById.get('["Reading"]')!;
+  const allReading = rankActivity(stats, [reading]);
+  expect(rankActivity(stats, [reading], "Reader")).toEqual({
+    apps: allReading.apps,
+    titles: [{ label: "A novel", app: "Reader", seconds: 120 }]
+  });
+  expect(rankActivity(stats, [reading], "Game")).toEqual(allReading);
+});
+
 it("assigns the primary colors by usage rather than by the first event", () => {
   const names = ["Study", "AI", "Programming", "Utilities"];
   const categories = names.map(name => ({
@@ -120,6 +135,24 @@ it("limits subcategory timeline bins and rankings to that branch", () => {
   expect(rankActivity(stats, [books]).titles).toEqual([{ app: "Reader", label: "Novel", seconds: 60 }]);
   expect(rankActivity(stats, [uncategorized]).apps).toEqual([{ label: "Another Reader", seconds: 120 }]);
   expect(rankActivity(stats, [books, uncategorized]).apps.map(row => row.label)).toEqual(["Another Reader", "Reader"]);
+});
+
+it("splits app time by category and hour using the same foreground intervals as app rankings", () => {
+  const video = ["Video, Social & Communication"];
+  const stats = buildActivityStatistics([
+    event(58, 180, "Brave", "Watch"),
+    event(59, 120, "TikTok", "Watch", "phone"),
+    event(61, 120, "Brave", "Other page"),
+    event(65, 30, "TikTok", "Watch", "phone")
+  ], [{ path: video, color: null, rule: { pattern: "^Watch$", ignoreCase: false, fields: ["title"], priority: 10 } }],
+  period, true, false);
+  const category = stats.categoriesById.get(JSON.stringify(video))!;
+  const browsing = stats.categoriesById.get('["Web Browsing"]')!;
+
+  expect(stats.periods[0].applicationTotals.get(category.id)).toEqual(new Map([["Brave", 120], ["TikTok", 60]]));
+  expect(stats.periods[1].applicationTotals.get(category.id)).toEqual(new Map([["Brave", 60], ["TikTok", 90]]));
+  expect(stats.periods[1].applicationTotals.get(browsing.id)).toEqual(new Map([["Brave", 120]]));
+  expect(rankActivity(stats, [category]).apps).toEqual([{ label: "Brave", seconds: 180 }, { label: "TikTok", seconds: 150 }]);
 });
 
 it("keeps directly assigned activity separate from child totals in the breakdown", () => {
